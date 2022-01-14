@@ -6,7 +6,7 @@ import tensorflow as tf
 from models.stylegan import StyleGAN
 from training import dataset, visualize
 from projection.projector import LatentProjector
-from train import ModelParameters
+from train_stylegan import ModelParameters
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

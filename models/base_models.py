@@ -57,6 +57,21 @@ class MappingNetwork(tf.keras.Model):
         return w
 
 
+class LatentMapper(tf.keras.Model):
+
+    def __init__(self, latent_size, num_layers):
+        super(LatentMapper, self).__init__()
+        self.latent_size = latent_size
+        
+        self.mapper = Sequential()
+        for _ in range(num_layers):
+            self.mapper.add(EqualizedLinear(latent_size, lrmul=0.01, apply_activ=True))
+
+    def call(self, w):
+        #w = normalize_2nd_moment(w)
+        delta = self.mapper(w)
+        return delta
+
 class LabelGuidedMapper(tf.keras.Model):
 
     def __init__(self, n_layers, latent_size):
@@ -229,8 +244,8 @@ class Comparator(tf.keras.Model):
     self.drop = Dropout(0.0)
     self.dense = Dense(1)
 
-  def call(self, inputs, training=False):
-    x = inputs
+  def call(self, image1, image2, training=False):
+    x = tf.concat([image1, image2], axis=-1)
     x = self.encoder(x, training=training)
     x = self.pooling(x)
     x = self.drop(x, training=training)

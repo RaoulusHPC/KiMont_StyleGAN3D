@@ -245,10 +245,10 @@ def get_projected_dataset(tfrecords):
     def read_tfrecord(serialized_example):
         # Parse the input tf.train.Example proto using the dictionary above.
         example = tf.io.parse_single_example(serialized_example, component_feature_description)
-        original_image = tf.io.parse_tensor(example['original_image_raw'], out_type='float32')
-        generated_image = tf.io.parse_tensor(example['generated_image_raw'], out_type='float32')
-        label = tf.io.parse_tensor(example['label_raw'], out_type='float32')
-        w = tf.io.parse_tensor(example['w_raw'], out_type='float32')
+        original_image = tf.io.parse_tensor(example['original_image_raw'], out_type='float32')[0]
+        generated_image = tf.io.parse_tensor(example['generated_image_raw'], out_type='float32')[0]
+        label = tf.io.parse_tensor(example['label_raw'], out_type='float32')[0]
+        w = tf.io.parse_tensor(example['w_raw'], out_type='float32')[0]
 
         return original_image, generated_image, label, w
 

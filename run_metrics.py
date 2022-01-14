@@ -4,9 +4,9 @@ from training.visualize import visualize_tensors
 from metrics.frechet_inception_distance import calculate_screenshot_fid, calculate_slice_fid
 from training import dataset
 from models.stylegan import StyleGAN
-import train
+import train_stylegan
 
-model_parameters = train.ModelParameters()
+model_parameters = train_stylegan.ModelParameters()
 
 tfrecords = ['data/mcb64_screws.tfrecords']
 real_dataset = dataset.get_mcb_dataset(

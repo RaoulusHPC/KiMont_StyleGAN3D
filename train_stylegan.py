@@ -91,7 +91,6 @@ def main():
         strategy = tf.distribute.MirroredStrategy()
     else:
         strategy = tf.distribute.get_strategy()
-        strategy = tf.distribute.MirroredStrategy()
 
     training_args = TrainingArguments()
     training_args.global_batch_size = training_args.batch_size_per_replica * strategy.num_replicas_in_sync
@@ -109,7 +108,6 @@ def main():
 
     dist_dataset = strategy.experimental_distribute_dataset(train_dataset)
     dist_dataset_iterator = iter(dist_dataset)
-
 
     with strategy.scope():
         model = StyleGAN(model_parameters=model_parameters)

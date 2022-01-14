@@ -1,0 +1,10 @@
+.vscode
+__pycache__
+data
+results
+tf_ckpts
+.ipynb_checkpoints
+logs
+papers
+thesis
+Dockerfile

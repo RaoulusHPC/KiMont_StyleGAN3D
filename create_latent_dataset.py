@@ -5,7 +5,7 @@ import tensorflow as tf
 
 from training import dataset, visualize
 from projection.projector import LatentProjector
-from train import ModelParameters
+from train_stylegan import ModelParameters
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         
         return tf.train.Example(features=tf.train.Features(feature=feature)).SerializeToString()
     
-    record_file = './projected_images.tfrecords'
+    record_file = 'data/latents.tfrecords'
     options = tf.io.TFRecordOptions(compression_type='GZIP')
 
     with tf.io.TFRecordWriter(record_file, options) as writer:

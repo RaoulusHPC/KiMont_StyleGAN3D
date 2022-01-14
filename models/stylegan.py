@@ -128,19 +128,22 @@ class StyleGAN(tf.keras.Model):
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
 
-            if self.args.r1_gamma != 0 and int(self.ckpt.step.read_value()) % self.args.r1_interval == 0:
-                disc_tape.watch(real_images)
-
             fake_images = self.generator(
                 z=fake_latents,
                 labels=fake_labels,
                 training=True)
             
             if self.args.apa:
-                num_mix_fakes = tf.math.reduce_sum(tf.cast(tf.random.uniform([self.args.batch_size_per_replica]) < self.ckpt.deception_strength.read_value(), 'int32'))
-                real_images = tf.concat([real_images[:self.args.batch_size_per_replica - num_mix_fakes], fake_images[:num_mix_fakes]], axis=0)
-                real_labels = tf.concat([real_labels[:self.args.batch_size_per_replica - num_mix_fakes], fake_labels[:num_mix_fakes]], axis=0)
-
+                pseudo_flag = tf.where(
+                    tf.random.uniform([self.args.batch_size_per_replica]) < self.ckpt.deception_strength.read_value(),
+                    1.,
+                    0.)
+                if tf.math.reduce_sum(pseudo_flag) > 0:
+                    real_images = fake_images * pseudo_flag[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis] + real_images * (1 - pseudo_flag[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis])
+                    real_labels = fake_labels * pseudo_flag[..., tf.newaxis] + real_labels * (1 - pseudo_flag[..., tf.newaxis])            
+            if self.args.r1_gamma != 0 and int(self.ckpt.step.read_value()) % self.args.r1_interval == 0:
+                disc_tape.watch(real_images)
+                
             fake_output = self.discriminator(
                 images=fake_images,
                 labels=fake_labels,
@@ -152,7 +155,7 @@ class StyleGAN(tf.keras.Model):
             
             self.training_metrics['real_scores'](real_output)
             self.training_metrics['fake_scores'](fake_output)
-            self.training_metrics['loss_signs_real'](tf.math.sign(real_output[:self.args.batch_size_per_replica - num_mix_fakes]))
+            self.training_metrics['loss_signs_real'](tf.math.sign(real_output))
             self.training_metrics['loss_signs_fake'](-tf.math.sign(fake_output))
 
             gen_loss = losses.generator_logistic_ns(fake_output)
@@ -163,12 +166,11 @@ class StyleGAN(tf.keras.Model):
 
             reg = tf.zeros((self.args.batch_size_per_replica, 1))
 
-            if self.args.r1_gamma != 0 and int(self.ckpt.step.read_value()) % self.args.r1_interval == 0:
-                r1_grads = tf.gradients(tf.math.reduce_sum(real_output), [real_images])[0]
-                r1_penalty = tf.math.reduce_sum(tf.math.square(r1_grads), axis=[1,2,3,4])
-                r1_penalty = r1_penalty[:, tf.newaxis]
-                # self.training_metrics['r1_reg'](r1_penalty)
-                reg = r1_penalty * (self.args.r1_gamma * 0.5) 
+            r1_grads = tf.gradients(tf.math.reduce_sum(real_output), [real_images])[0]
+            r1_penalty = tf.math.reduce_sum(tf.math.square(r1_grads), axis=[1,2,3,4])
+            r1_penalty = r1_penalty[:, tf.newaxis]
+            self.training_metrics['r1_reg'](r1_penalty)
+            reg = r1_penalty * (self.args.r1_gamma * 0.5) 
 
             gen_loss = tf.nn.compute_average_loss(gen_loss, global_batch_size=self.args.global_batch_size)
 

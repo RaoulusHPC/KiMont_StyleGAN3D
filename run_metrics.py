@@ -8,12 +8,12 @@ import train
 
 model_parameters = train.ModelParameters()
 
-tfrecords = ['data/mcb32_experimental.tfrecords']
+tfrecords = ['data/mcb64_screws.tfrecords']
 real_dataset = dataset.get_mcb_dataset(
     tfrecords=tfrecords,
     batch_size=64,
-    repeat=2,
-    augment_function=dataset.augment)
+    repeat=1,
+    augment_function=None)
     
 model = StyleGAN(model_parameters=model_parameters)
 model.build()
@@ -34,7 +34,7 @@ for checkpoint in manager.checkpoints[::10]:
     ckpt.restore(checkpoint).expect_partial()
     print(int(ckpt.seen_images // 1000))
     # screenshot_fid = calculate_screenshot_fid(model.mapping_network_ema, model.generator_ema, 10_000, real_dataset, 64)
-    slice_fids = calculate_slice_fid(model.generator_ema, 25_000, real_dataset, 64)
+    slice_fids = calculate_slice_fid(model.generator_ema, 21_000, real_dataset, 64)
     storage.append(slice_fids)
     
 for fid in storage:

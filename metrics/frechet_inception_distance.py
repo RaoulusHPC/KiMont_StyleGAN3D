@@ -70,9 +70,10 @@ def calculate_slice_fid(generator, num_fakes, real_dataset, batch_size):
                 pickle.dump((sag_mu_real, sag_sigma_real, axi_mu_real, axi_sigma_real, cor_mu_real, cor_sigma_real), f)
 
         # Generate fake datasets
-        sag_fake_dataset = []
-        axi_fake_dataset = []
-        cor_fake_dataset = []
+        with tf.device('/CPU:0'):
+            sag_fake_dataset = []
+            axi_fake_dataset = []
+            cor_fake_dataset = []
         print('Generating fake data')
 
         label_iterator = iter(label_dataset)
@@ -97,9 +98,10 @@ def calculate_slice_fid(generator, num_fakes, real_dataset, batch_size):
             fake_dataset = tf.tile(fake_dataset, [1, 1, 1, 3])
             return fake_dataset
 
-        sag_fake_dataset = prepare_fake_dataset(sag_fake_dataset)
-        axi_fake_dataset = prepare_fake_dataset(axi_fake_dataset)
-        cor_fake_dataset = prepare_fake_dataset(cor_fake_dataset)
+        with tf.device('/CPU:0'):
+            sag_fake_dataset = prepare_fake_dataset(sag_fake_dataset)
+            axi_fake_dataset = prepare_fake_dataset(axi_fake_dataset)
+            cor_fake_dataset = prepare_fake_dataset(cor_fake_dataset)
 
         print('Calculating fake statistics')
         sag_mu_fake, sag_sigma_fake = calculate_statistics(sag_fake_dataset)

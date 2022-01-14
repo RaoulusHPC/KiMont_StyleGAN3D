@@ -1,5 +1,5 @@
 
-FROM tensorflow/tensorflow:2.7.0-gpu
+FROM tensorflow/tensorflow:2.6.1-gpu
 
 ARG USER_ID
 ARG GROUP_ID
@@ -17,4 +17,3 @@ USER user
 WORKDIR /stylegan3d
 
 ENV AM_I_IN_A_DOCKER_CONTAINER Yes
-

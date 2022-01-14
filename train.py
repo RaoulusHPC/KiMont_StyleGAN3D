@@ -30,7 +30,7 @@ class TrainingArguments:
     global_batch_size: int = batch_size_per_replica
 
     gen_lr: float = 2e-3
-    disc_lr: float = 2e-3
+    disc_lr: float = 1.5e-3
     adam_beta_1: float = 0.0
     adam_beta_2: float = 0.99
     adam_gen_eps: float = 1e-8
@@ -44,7 +44,7 @@ class TrainingArguments:
     apa: bool = True
     apa_interval: int = 4
     tune_target: float = 0.6
-    tune_kimg: int = 500
+    tune_kimg: int = 800
 
     print_interval: int = 100
     evaluate_interval: int = 2000
@@ -60,6 +60,7 @@ def main():
     # parser.add_argument("--data_dir", type=str, default="/mnt/md0/Pycharm_Raid/datasets/mcb/32", help="path to folder containing data")
 
     args = parser.parse_args()
+    os.environ["NCCL_DEBUG"] = "INFO"
 
     if not args.use_gpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -79,8 +80,8 @@ def main():
             for gpu in gpus:
                 if args.memory_growth:
                     tf.config.experimental.set_memory_growth(gpu, True)
-                logical_gpus = tf.config.list_logical_devices('GPU')
-                print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
             print(e)
@@ -99,12 +100,12 @@ def main():
     model_parameters = ModelParameters()
 
     # tfrecords = list(Path(args.data_dir).rglob('*.tfrecords'))
-    tfrecords = ['data/mcb64_experimental.tfrecords']
+    tfrecords = ['data/mcb64_screws.tfrecords']
     train_dataset = dataset.get_mcb_dataset(
         tfrecords=tfrecords,
         batch_size=training_args.global_batch_size,
         repeat=1000,
-        augment_function=dataset.augment)
+        augment_function=None)
 
     dist_dataset = strategy.experimental_distribute_dataset(train_dataset)
     dist_dataset_iterator = iter(dist_dataset)
@@ -151,7 +152,7 @@ def main():
             nimg_delta = model.args.apa_interval * model.args.global_batch_size
             nimg_ratio = nimg_delta / (model.args.tune_kimg * 1000)
             deception_strength = model.ckpt.deception_strength.read_value() + nimg_ratio * np.sign(rt - model.args.tune_target)
-            deception_strength = max(deception_strength, 0)
+            deception_strength = min(max(deception_strength, 0), 0.4)
 
             model.ckpt.deception_strength.assign(deception_strength)
 

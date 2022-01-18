@@ -137,13 +137,11 @@ def get_abc_dataset(tfrecords, batch_size: int=1, repeat: int=1, augment_functio
         component = tf.cast(component, 'float32')
         component = 2 * component - 1
         component = component[..., tf.newaxis]
-        return component, None
+        return component, tf.zeros(shape=())
 
     dataset = raw_component_dataset.map(read_tfrecord)
-    dataset = dataset.shuffle(1024, reshuffle_each_iteration=True)
+    dataset = dataset.shuffle(2048, reshuffle_each_iteration=True)
     dataset = dataset.repeat(repeat)
-    if augment_function:
-        dataset = dataset.map(augment_function)
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset

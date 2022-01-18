@@ -10,7 +10,6 @@ from tensorflow.keras.optimizers import Adam
 from training.visualize import screenshot_and_save
 from training import losses
 from training import dataset
-from training.training_metrics import TrainingMetrics
 from models import base_models
 
 
@@ -140,7 +139,9 @@ class StyleGAN(tf.keras.Model):
                     0.)
                 if tf.math.reduce_sum(pseudo_flag) > 0:
                     real_images = fake_images * pseudo_flag[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis] + real_images * (1 - pseudo_flag[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis])
-                    real_labels = fake_labels * pseudo_flag[..., tf.newaxis] + real_labels * (1 - pseudo_flag[..., tf.newaxis])            
+                    if self.model_parameters.label_size > 0:
+                        real_labels = fake_labels * pseudo_flag[..., tf.newaxis] + real_labels * (1 - pseudo_flag[..., tf.newaxis]) 
+
             if self.args.r1_gamma != 0 and int(self.ckpt.step.read_value()) % self.args.r1_interval == 0:
                 disc_tape.watch(real_images)
                 

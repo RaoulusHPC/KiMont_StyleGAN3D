@@ -59,7 +59,7 @@ if __name__ == "__main__":
         generator_ema=model.generator_ema)
     manager = tf.train.CheckpointManager(
         ckpt,
-        directory='./tf_ckpts',
+        directory='ckpts/stylegan/',
         max_to_keep=None)
     ckpt.restore(manager.latest_checkpoint).expect_partial()
     generator = model.generator_ema
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     comparator = Comparator()
     comparator_input = tf.zeros(shape=(1, 64, 64, 64, 1))
     comparator((comparator_input, comparator_input))
-    comparator.load_weights('tf_ckpt_comparator/')
+    comparator.load_weights('ckpts/comparator/')
     comparator.trainable = False
 
     mapper = LatentMapper(generator.latent_size, num_layers=4)
@@ -79,8 +79,11 @@ if __name__ == "__main__":
     optimizer = Adam(learning_rate=parameters.learning_rate)
     loss_object = tf.losses.BinaryCrossentropy(from_logits=True)
 
-    train_loss = tf.keras.metrics.Mean(name='train_loss')
-    test_loss = tf.keras.metrics.Mean(name='test_loss')
+    train_loss_metric = tf.keras.metrics.Mean(name='train_loss')
+    test_loss_metric = tf.keras.metrics.Mean(name='test_loss')
+    grab0_loss_metric = tf.keras.metrics.Mean(name='grab0_loss')
+    grab1_loss_metric = tf.keras.metrics.Mean(name='grab1_loss')
+    l2_loss_metric = tf.keras.metrics.Mean(name='l2_loss')
 
     @tf.function
     def train_step(w, generated_image):
@@ -98,7 +101,7 @@ if __name__ == "__main__":
         gradients = tape.gradient(loss, mapper.trainable_variables)
         optimizer.apply_gradients(zip(gradients, mapper.trainable_variables))
 
-        train_loss(loss)
+        train_loss_metric(loss)
 
     @tf.function
     def test_step(w, generated_image):
@@ -113,41 +116,47 @@ if __name__ == "__main__":
         l2_loss = tf.math.reduce_mean(tf.math.square(delta))
         loss = grab_loss + parameters.l2_lambda * l2_loss
 
-        test_loss(loss)
+        test_loss_metric(loss)
+        grab0_loss_metric(grab0_loss)
+        grab1_loss_metric(grab1_loss)
+        l2_loss_metric(l2_loss)
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    train_log_dir = 'logs/mapper/' + current_time + '/train'
-    test_log_dir = 'logs/mapper/' + current_time + '/test'
+    dir_name = f'{current_time}_{parameters.lambda0}_{parameters.lambda1}'
+    checkpoint_dir = f'ckpts/mapper/{dir_name}/'
+    train_log_dir = f'logs/mapper/{dir_name}/train'
+    test_log_dir = f'logs/mapper/{dir_name}/test'
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     test_summary_writer = tf.summary.create_file_writer(test_log_dir)
+
     EPOCHS = parameters.epochs
 
     for epoch in range(EPOCHS):
         # Reset the metrics at the start of the next epoch
-        train_loss.reset_states()
-        test_loss.reset_states()
+        train_loss_metric.reset_states()
+        test_loss_metric.reset_states()
 
         for generated_image, w  in train_dataset:
             train_step(w, generated_image)
         with train_summary_writer.as_default():
-            tf.summary.scalar('loss', train_loss.result(), step=epoch)
+            tf.summary.scalar('loss', train_loss_metric.result(), step=epoch)
 
         for generated_image, w in val_dataset:
             test_step(w, generated_image)
         with test_summary_writer.as_default():
-            tf.summary.scalar('loss', test_loss.result(), step=epoch)
-            if epoch == 0:
-                lowest_loss = test_loss.result()
-                mapper.save_weights('tf_ckpt_mapper_grab01_3/')
-            if test_loss.result() < lowest_loss:
-                lowest_loss = test_loss.result()
-                mapper.save_weights('tf_ckpt_mapper_grab01_3/')
+            tf.summary.scalar('loss', test_loss_metric.result(), step=epoch)
+            tf.summary.scalar('grab0_loss', grab0_loss_metric.result(), step=epoch)
+            tf.summary.scalar('grab1_loss', grab1_loss_metric.result(), step=epoch)
+            tf.summary.scalar('l2_loss', l2_loss_metric.result(), step=epoch)
+            if epoch == 0 or test_loss_metric.result() < lowest_loss:
+                lowest_loss = test_loss_metric.result()
+                mapper.save_weights(checkpoint_dir)
                 print('Saved weights')
 
         print(
             f'Epoch {epoch + 1}, '
-            f'Loss: {train_loss.result()}, '
-            f'Test Loss: {test_loss.result()}'
+            f'Loss: {train_loss_metric.result()}, '
+            f'Test Loss: {test_loss_metric.result()}'
         )
 
 

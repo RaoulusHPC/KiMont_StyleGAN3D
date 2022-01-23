@@ -51,7 +51,7 @@ val_dataset = strategy.experimental_distribute_dataset(val_dataset)
 train_dataset = tf_dataset.skip(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).map(lambda x, y: dataset.simple_grab_aug(x, y)).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
 train_dataset = strategy.experimental_distribute_dataset(train_dataset)
 
-checkpoint_dir = 'tf_ckpt_comparator/'
+checkpoint_dir = 'ckpts/comparator/'
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_dir,
         save_freq='epoch',

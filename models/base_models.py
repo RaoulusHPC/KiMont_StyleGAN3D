@@ -136,24 +136,11 @@ class GeneratorStatic(tf.keras.Model):
 
     def call(self, z, labels):
 
-        batch_size = tf.shape(z)[0]
-
         w = self.mapping_network(
             z=z,
             labels=labels)
             
-        w = tf.tile(tf.expand_dims(w, axis=1), [1, self.num_ws, 1])
-
-        # Expand the learned constant to match batch size
-        x = tf.tile(self.initial_constant, [batch_size, 1, 1, 1, 1])
-        x = self.conv(x, w[:, 0])
-
-        for i in range(len(self.blocks)):
-            x = self.blocks[i](x, w[:, 2*i+1], w[:, 2*i+2])
-
-        rgb = self.to_rgb(x, w[:, -1])
-        x = self.final_activation(rgb)
-        return x
+        return self.synthesize(w, broadcast=True)
 
     def synthesize(self, w, broadcast=True):
 
@@ -232,19 +219,18 @@ class Comparator(tf.keras.Model):
     super(Comparator, self).__init__()
     self.encoder = tf.keras.Sequential([
       InputLayer(input_shape=(64, 64, 64, 2)),
-      ConvBlock(filters=16, kernel_size=3, activation='swish', padding='same', strides=2),
-      ConvBlock(filters=8, kernel_size=3, activation='swish', padding='same', strides=1),
       ConvBlock(filters=8, kernel_size=3, activation='swish', padding='same', strides=2),
-      ConvBlock(filters=16, kernel_size=3, activation='swish', padding='same', strides=1),
       ConvBlock(filters=16, kernel_size=3, activation='swish', padding='same', strides=2),
-      ConvBlock(filters=16, kernel_size=3, activation='swish', padding='same', strides=1),
+      ConvBlock(filters=24, kernel_size=3, activation='swish', padding='same', strides=2),
+      ConvBlock(filters=32, kernel_size=3, activation='swish', padding='same', strides=2),
       ConvBlock(filters=32, kernel_size=3, activation='swish', padding='same', strides=1),
     ])
-    self.pooling = GlobalAveragePooling3D()
-    self.drop = Dropout(0.0)
+    self.pooling = Flatten()
+    self.drop = Dropout(0.5)
     self.dense = Dense(1)
 
-  def call(self, image1, image2, training=False):
+  def call(self, inputs, training=False):
+    image1, image2 = inputs
     x = tf.concat([image1, image2], axis=-1)
     x = self.encoder(x, training=training)
     x = self.pooling(x)

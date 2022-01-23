@@ -100,7 +100,7 @@ def main():
 
     # tfrecords = list(Path('/mnt/md0/Pycharm_Raid/datasets/abc/tfrecords/64_filled').rglob('*.tfrecords'))
     tfrecords = ['data/mcb64_screws.tfrecords']
-    train_dataset = dataset.get_abc_dataset(
+    train_dataset = dataset.get_mcb_dataset(
         tfrecords=tfrecords,
         batch_size=training_args.global_batch_size,
         repeat=1000,

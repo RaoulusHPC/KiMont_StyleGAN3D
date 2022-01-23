@@ -1,6 +1,7 @@
 import argparse
 import math
 import os
+import datetime
 from tqdm import tqdm
 
 import tensorflow as tf
@@ -17,12 +18,16 @@ class TrainingArguments:
     epochs: int = 10
     batch_size: int = 32
     learning_rate: float = 0.5
-    val_size: int = 1000
+    train_size: int = 5000
     l2_lambda: float = 1.0
+    lambda0: float = 0.5
+    lambda1: float = 0.5
 
 if __name__ == "__main__":
 
     parameters = TrainingArguments()
+
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
     gpus = tf.config.list_physical_devices('GPU')
@@ -31,8 +36,8 @@ if __name__ == "__main__":
     tf_dataset = dataset.get_projected_dataset(tfrecords)
     # tf_dataset = tf_dataset.take(600)
     tf_dataset = tf_dataset.map(lambda o, g, l, w : (g, w))
-    val_dataset = tf_dataset.take(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
-    train_dataset = tf_dataset.skip(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
+    train_dataset = tf_dataset.take(parameters.train_size).shuffle(5000, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
+    val_dataset = tf_dataset.skip(parameters.train_size).shuffle(5000, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)    
     
     # c = 0
     # for d in train_dataset:
@@ -63,7 +68,7 @@ if __name__ == "__main__":
     # visualize.visualize_tensors([original_image, generated_image, binarize(generated_image)], shape=(1, 3))
     comparator = Comparator()
     comparator_input = tf.zeros(shape=(1, 64, 64, 64, 1))
-    comparator(comparator_input, comparator_input)
+    comparator((comparator_input, comparator_input))
     comparator.load_weights('tf_ckpt_comparator/')
     comparator.trainable = False
 
@@ -83,8 +88,11 @@ if __name__ == "__main__":
             delta = mapper(w)
             w_opt = w + delta
             optimized_image = generator.synthesize(w_opt)
-            comparison_logits = comparator(generated_image, optimized_image, training=False)
-            grab_loss = loss_object(tf.zeros_like(comparison_logits), comparison_logits)
+            comparison_logits = comparator((generated_image, optimized_image), training=False)
+            grab0_loss = loss_object(tf.zeros_like(comparison_logits), comparison_logits)
+            comparison_logits2 = comparator((optimized_image, generated_image), training=False)
+            grab1_loss = loss_object(tf.ones_like(comparison_logits2), comparison_logits2)
+            grab_loss = parameters.lambda0 * grab0_loss + parameters.lambda1 * grab1_loss 
             l2_loss = tf.math.reduce_mean(tf.math.square(delta))
             loss = grab_loss + parameters.l2_lambda * l2_loss
         gradients = tape.gradient(loss, mapper.trainable_variables)
@@ -97,13 +105,21 @@ if __name__ == "__main__":
         delta = mapper(w)
         w_opt = w + delta
         optimized_image = generator.synthesize(w_opt)
-        comparison_logits = comparator(generated_image, optimized_image, training=False)
-        grab_loss = loss_object(tf.zeros_like(comparison_logits), comparison_logits)
+        comparison_logits = comparator((generated_image, optimized_image), training=False)
+        grab0_loss = loss_object(tf.zeros_like(comparison_logits), comparison_logits)
+        comparison_logits2 = comparator((optimized_image, generated_image), training=False)
+        grab1_loss = loss_object(tf.ones_like(comparison_logits2), comparison_logits2)
+        grab_loss = parameters.lambda0 * grab0_loss + parameters.lambda1 * grab1_loss 
         l2_loss = tf.math.reduce_mean(tf.math.square(delta))
         loss = grab_loss + parameters.l2_lambda * l2_loss
 
         test_loss(loss)
 
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    train_log_dir = 'logs/mapper/' + current_time + '/train'
+    test_log_dir = 'logs/mapper/' + current_time + '/test'
+    train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+    test_summary_writer = tf.summary.create_file_writer(test_log_dir)
     EPOCHS = parameters.epochs
 
     for epoch in range(EPOCHS):
@@ -113,9 +129,20 @@ if __name__ == "__main__":
 
         for generated_image, w  in train_dataset:
             train_step(w, generated_image)
+        with train_summary_writer.as_default():
+            tf.summary.scalar('loss', train_loss.result(), step=epoch)
 
         for generated_image, w in val_dataset:
             test_step(w, generated_image)
+        with test_summary_writer.as_default():
+            tf.summary.scalar('loss', test_loss.result(), step=epoch)
+            if epoch == 0:
+                lowest_loss = test_loss.result()
+                mapper.save_weights('tf_ckpt_mapper_grab01_3/')
+            if test_loss.result() < lowest_loss:
+                lowest_loss = test_loss.result()
+                mapper.save_weights('tf_ckpt_mapper_grab01_3/')
+                print('Saved weights')
 
         print(
             f'Epoch {epoch + 1}, '
@@ -123,6 +150,6 @@ if __name__ == "__main__":
             f'Test Loss: {test_loss.result()}'
         )
 
-    mapper.save_weights('tf_ckpt_mapper/')
+
 
     

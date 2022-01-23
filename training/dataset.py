@@ -111,16 +111,7 @@ def simple_grab_aug(components, label):
     if tf.random.uniform([]) < 0.5:
         comp1, comp2 = comp2, comp1
         label = tf.cond(label > 0.5, lambda : 0., lambda : 1.)
-    components = tf.concat([comp1, comp2], axis=-1)
-    return components, label
-
-def simple_grab(components, label):
-    comp1, comp2 = components
-    # if tf.random.uniform([]) < 0.5:
-    #     comp1, comp2 = comp2, comp1
-    #     label = tf.cond(label > 0.5, lambda : 0., lambda : 1.)
-    components = tf.concat([comp1, comp2], axis=-1)
-    return components, label
+    return (comp1, comp2), label
 
 def get_abc_dataset(tfrecords, batch_size: int=1, repeat: int=1, augment_function: callable=None):
     raw_component_dataset = tf.data.TFRecordDataset(tfrecords, compression_type='GZIP')

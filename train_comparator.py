@@ -15,11 +15,11 @@ from training import dataset
 from models.base_models import Comparator
 
 class TrainingArguments:
-    epochs: int = 10
+    epochs: int = 15
     batch_size: int = 32
     learning_rate: float = 1e-3
-    adam_eps: float = 1e-8
-    val_size: int = 0
+    adam_eps: float = 1e-7
+    val_size: int = 200
 
 
 parameters = TrainingArguments()
@@ -45,35 +45,34 @@ else:
 
 tfrecords = ['data/simpleGRAB_1000.tfrecords']
 tf_dataset = dataset.get_simplegrab_dataset(tfrecords)
-tf_dataset = tf_dataset.shuffle(2048)
 
-val_dataset = tf_dataset.take(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).map(lambda x, y: dataset.simple_grab(x, y)).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
+val_dataset = tf_dataset.take(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
 val_dataset = strategy.experimental_distribute_dataset(val_dataset)
 train_dataset = tf_dataset.skip(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).map(lambda x, y: dataset.simple_grab_aug(x, y)).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
 train_dataset = strategy.experimental_distribute_dataset(train_dataset)
 
+checkpoint_dir = 'tf_ckpt_comparator/'
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath='tf_ckpt_comparator/',
+        filepath=checkpoint_dir,
         save_freq='epoch',
         save_weights_only=True,
         monitor='val_accuracy',
         mode='max',
         save_best_only=True)
 
-checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath='tf_ckpt_comparator_2/',
-        save_freq='epoch',
-        save_weights_only=True,
-        monitor='accuracy',
-        mode='max',
-        save_best_only=True)
+tensorboard_callback = tf.keras.callbacks.TensorBoard(
+    log_dir='logs/comparator'
+)
 
 with strategy.scope():
     comparator = Comparator()
-    comparator.build((None, 64, 64, 64, 2))
+    comparator_input = tf.zeros(shape=(1, 64, 64, 64, 1))
+    comparator((comparator_input, comparator_input))
     comparator.summary()
-
-    opt = tf.keras.optimizers.Adam(learning_rate=parameters.learning_rate, epsilon=parameters.adam_eps)
+    learning_rate = tf.keras.optimizers.schedules.CosineDecay(
+        1e-3, 1000/parameters.batch_size * parameters.epochs, alpha=0.0, name=None
+    )
+    opt = tf.keras.optimizers.Adam(learning_rate=learning_rate, epsilon=parameters.adam_eps)
     comparator.compile(optimizer=opt, loss=losses.BinaryCrossentropy(from_logits=True), metrics=['accuracy'])
 
 from training.visualize import visualize_tensors
@@ -84,19 +83,22 @@ from training.visualize import visualize_tensors
 #     visualize_tensors([x])
 
 # comparator.load_weights('tf_ckpt_comparator/')
-for x, y in train_dataset:
-    x = x[0:1]
-    y = y[0:1]
-    # print(y.numpy(), comparator(x, training=False).numpy())
-    print(y.numpy())
-    # visualize_tensors([x[..., 0]])
-    # visualize_tensors([x[..., 1]])
-    visualize_tensors([x[..., 0], x[..., 1], x[..., int(y.numpy())]], shape=(1, 3))
+# for x, y in train_dataset:
+#     x = x[0:1]
+#     y = y[0:1]
+#     # print(y.numpy(), comparator(x, training=False).numpy())
+#     print(y.numpy())
+#     # visualize_tensors([x[..., 0]])
+#     # visualize_tensors([x[..., 1]])
+#     visualize_tensors([x[..., 0], x[..., 1], x[..., int(y.numpy())]], shape=(1, 3))
 
 comparator.fit(
     train_dataset,
     validation_data=val_dataset,
     verbose=1,
     epochs=parameters.epochs,
-    callbacks=[checkpoint_callback])
+    callbacks=[checkpoint_callback, tensorboard_callback])
+
+comparator.load_weights(checkpoint_dir)
+comparator.evaluate(val_dataset)
 

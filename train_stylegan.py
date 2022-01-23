@@ -15,7 +15,7 @@ from training import dataset
 class ModelParameters:
     img_dim: int = 64
     latent_size: int = 160
-    label_size: int = 0
+    label_size: int = 9
     num_layers: int = 8
     gen_filters: List = field(default_factory=lambda:[128, 128, 64, 32, 16])
     disc_filters: List = field(default_factory=lambda:[16, 32, 64, 64, 128, 128, 128])
@@ -33,7 +33,7 @@ class TrainingArguments:
     disc_lr: float = 1.5e-3
     adam_beta_1: float = 0.0
     adam_beta_2: float = 0.99
-    adam_gen_eps: float = 1e-8
+    adam_gen_eps: float = 1e-7
 
     r1_interval: int = 1
     r1_gamma: int = 10
@@ -47,10 +47,10 @@ class TrainingArguments:
     tune_kimg: int = 800
 
     print_interval: int = 100
-    evaluate_interval: int = 2000
+    evaluate_interval: int = 5000
     log_interval: int = 100
     metric_interval: int = 5000
-    checkpoint_interval: int = 1000
+    checkpoint_interval: int = 2000
 
 
 def main():
@@ -98,8 +98,8 @@ def main():
 
     model_parameters = ModelParameters()
 
-    tfrecords = list(Path('/mnt/md0/Pycharm_Raid/datasets/abc/tfrecords/64_filled').rglob('*.tfrecords'))
-    # tfrecords = ['data/mcb64_screws.tfrecords']
+    # tfrecords = list(Path('/mnt/md0/Pycharm_Raid/datasets/abc/tfrecords/64_filled').rglob('*.tfrecords'))
+    tfrecords = ['data/mcb64_screws.tfrecords']
     train_dataset = dataset.get_abc_dataset(
         tfrecords=tfrecords,
         batch_size=training_args.global_batch_size,

@@ -76,7 +76,9 @@ def calculate_slice_fid(generator, fake_multiplier, real_dataset, batch_size):
             cor_fake_dataset = []
         print('Generating fake data')
 
-        for labels in label_dataset:
+        for labels in tqdm(label_dataset):
+            if tf.shape(labels)[0] < batch_size:
+                break
             fake_latents = tf.random.normal(shape=(batch_size, generator.latent_size))
             # labels = dataset.get_random_labels(batch_size=batch_size, label_size=generator.label_size)
             generated_images = generator(

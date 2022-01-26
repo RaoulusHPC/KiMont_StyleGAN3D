@@ -1,3 +1,4 @@
+import csv
 import tensorflow as tf
 from training.visualize import visualize_tensors
 
@@ -29,13 +30,12 @@ manager = tf.train.CheckpointManager(
     directory='./tf_ckpts',
     max_to_keep=None)
 
-storage = []
-for checkpoint in manager.checkpoints[::10]:
-    ckpt.restore(checkpoint).expect_partial()
-    print(int(ckpt.seen_images // 1000))
-    # screenshot_fid = calculate_screenshot_fid(model.mapping_network_ema, model.generator_ema, 10_000, real_dataset, 64)
-    slice_fids = calculate_slice_fid(model.generator_ema, 21_000, real_dataset, 64)
-    storage.append(slice_fids)
-    
-for fid in storage:
-    print(fid)
+with open('fids.csv', 'w', newline='') as csvfile:
+    spamwriter = csv.writer(csvfile, delimiter=' ',
+                            quotechar='|', quoting=csv.QUOTE_MINIMAL)
+    for checkpoint in manager.checkpoints[::2]:
+        ckpt.restore(checkpoint).expect_partial()
+        print(int(ckpt.seen_images // 1000))
+        # screenshot_fid = calculate_screenshot_fid(model.mapping_network_ema, model.generator_ema, 10_000, real_dataset, 64)
+        slice_fids = calculate_slice_fid(model.generator_ema, 2, real_dataset, 64)
+        spamwriter.writerow(list(slice_fids))

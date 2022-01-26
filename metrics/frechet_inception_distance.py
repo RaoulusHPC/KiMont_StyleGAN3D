@@ -19,7 +19,7 @@ def calculate_fid(mu_real, sigma_real, mu_fake, sigma_fake):
     return np.real(dist)
 
 
-def calculate_slice_fid(generator, num_fakes, real_dataset, batch_size):
+def calculate_slice_fid(generator, fake_multiplier, real_dataset, batch_size):
 
         img_dim = generator.img_dim
         upscale_factor = int(math.ceil(75 / img_dim))
@@ -43,7 +43,7 @@ def calculate_slice_fid(generator, num_fakes, real_dataset, batch_size):
         # Define real datasets
         upscaler = tf.keras.layers.UpSampling2D(size=upscale_factor)
 
-        label_dataset =  real_dataset.map(lambda x, y: y)
+        label_dataset =  real_dataset.map(lambda x, y: y).repeat(fake_multiplier)
         real_dataset = real_dataset.map(lambda x, y: tf.tile(x, [1, 1, 1, 1, 3]))
         real_dataset = real_dataset.map(lambda x: 0.5 * (x + 1))
 
@@ -76,11 +76,9 @@ def calculate_slice_fid(generator, num_fakes, real_dataset, batch_size):
             cor_fake_dataset = []
         print('Generating fake data')
 
-        label_iterator = iter(label_dataset)
-        for _ in tqdm(range(0, num_fakes, batch_size)):
+        for labels in label_dataset:
             fake_latents = tf.random.normal(shape=(batch_size, generator.latent_size))
             # labels = dataset.get_random_labels(batch_size=batch_size, label_size=generator.label_size)
-            labels = next(label_iterator)
             generated_images = generator(
                 z=fake_latents,
                 labels=labels,
@@ -92,7 +90,7 @@ def calculate_slice_fid(generator, num_fakes, real_dataset, batch_size):
             cor_fake_dataset.append(generated_images[:, :, :, generator.img_dim // 2])
 
         def prepare_fake_dataset(fake_dataset):
-            fake_dataset = tf.concat(fake_dataset, axis=0)[:num_fakes]
+            fake_dataset = tf.concat(fake_dataset, axis=0)
             fake_dataset = tf.where(fake_dataset > 0, 1., 0.)
             fake_dataset = upscaler(fake_dataset)
             fake_dataset = tf.tile(fake_dataset, [1, 1, 1, 3])

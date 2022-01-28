@@ -130,6 +130,7 @@ class StyleGAN(tf.keras.Model):
                 labels=fake_labels,
                 training=True)
             
+            real_images_tmp = real_images
             if self.args.apa:
                 pseudo_flag = tf.random.uniform([self.args.batch_size_per_replica]) < self.ckpt.deception_strength.read_value()
                 pseudo_flag_float = tf.cast(pseudo_flag, 'float32')
@@ -137,9 +138,7 @@ class StyleGAN(tf.keras.Model):
                     real_images_tmp = fake_images * pseudo_flag_float[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis] + real_images * (1 - pseudo_flag_float[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis])
                     if self.model_parameters.label_size > 0:
                         real_labels = fake_labels * pseudo_flag_float[..., tf.newaxis] + real_labels * (1 - pseudo_flag_float[..., tf.newaxis]) 
-            else:
-                real_images_tmp = real_images
-
+                
             real_images_tmp = tf.stop_gradient(real_images_tmp)
             disc_tape.watch(real_images_tmp)
                 
@@ -153,7 +152,7 @@ class StyleGAN(tf.keras.Model):
                 training=True)
             
             # to compute metrics for the unaugmented real dataset
-            if self.apa:
+            if self.args.apa:
                 undeceived_logits = tf.boolean_mask(real_output, tf.math.logical_not(pseudo_flag))
             else:
                 undeceived_logits = real_output

@@ -15,7 +15,7 @@ from training import dataset
 from models.base_models import Comparator
 
 class TrainingArguments:
-    epochs: int = 15
+    epochs: int = 20
     batch_size: int = 32
     learning_rate: float = 1e-3
     adam_eps: float = 1e-7

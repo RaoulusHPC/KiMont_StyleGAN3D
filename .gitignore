@@ -9,3 +9,5 @@ thesis
 tf_ckpt*
 cache
 *.png
+optimization/results
+ckpts

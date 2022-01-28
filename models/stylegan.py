@@ -119,11 +119,9 @@ class StyleGAN(tf.keras.Model):
         self.generator_ema(z, labels)
         self.generator_ema.set_weights(self.generator.get_weights())
 
-    def train_step(self, real_images, real_labels):
+    def train_step(self, real_images, real_labels, fake_labels):
 
         fake_latents = tf.random.normal(shape=(self.args.batch_size_per_replica, self.model_parameters.latent_size))
-        # fake_labels = dataset.get_random_labels(batch_size=self.args.batch_size_per_replica, label_size=self.model_parameters.label_size)
-        fake_labels = real_labels
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
 
@@ -133,30 +131,35 @@ class StyleGAN(tf.keras.Model):
                 training=True)
             
             if self.args.apa:
-                pseudo_flag = tf.where(
-                    tf.random.uniform([self.args.batch_size_per_replica]) < self.ckpt.deception_strength.read_value(),
-                    1.,
-                    0.)
-                if tf.math.reduce_sum(pseudo_flag) > 0:
-                    real_images = fake_images * pseudo_flag[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis] + real_images * (1 - pseudo_flag[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis])
+                pseudo_flag = tf.random.uniform([self.args.batch_size_per_replica]) < self.ckpt.deception_strength.read_value()
+                pseudo_flag_float = tf.cast(pseudo_flag, 'float32')
+                if tf.math.reduce_sum(pseudo_flag_float) > 0:
+                    real_images_tmp = fake_images * pseudo_flag_float[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis] + real_images * (1 - pseudo_flag_float[..., tf.newaxis, tf.newaxis, tf.newaxis, tf.newaxis])
                     if self.model_parameters.label_size > 0:
-                        real_labels = fake_labels * pseudo_flag[..., tf.newaxis] + real_labels * (1 - pseudo_flag[..., tf.newaxis]) 
+                        real_labels = fake_labels * pseudo_flag_float[..., tf.newaxis] + real_labels * (1 - pseudo_flag_float[..., tf.newaxis]) 
+            else:
+                real_images_tmp = real_images
 
-            if self.args.r1_gamma != 0 and int(self.ckpt.step.read_value()) % self.args.r1_interval == 0:
-                disc_tape.watch(real_images)
+            real_images_tmp = tf.stop_gradient(real_images_tmp)
+            disc_tape.watch(real_images_tmp)
                 
             fake_output = self.discriminator(
                 images=fake_images,
                 labels=fake_labels,
                 training=True)
             real_output = self.discriminator(
-                images=real_images,
+                images=real_images_tmp,
                 labels=real_labels,
                 training=True)
             
-            self.training_metrics['real_scores'](real_output)
+            # to compute metrics for the unaugmented real dataset
+            if self.apa:
+                undeceived_logits = tf.boolean_mask(real_output, tf.math.logical_not(pseudo_flag))
+            else:
+                undeceived_logits = real_output
+            self.training_metrics['real_scores'](undeceived_logits)
             self.training_metrics['fake_scores'](fake_output)
-            self.training_metrics['loss_signs_real'](tf.math.sign(real_output))
+            self.training_metrics['loss_signs_real'](tf.math.sign(undeceived_logits))
             self.training_metrics['loss_signs_fake'](-tf.math.sign(fake_output))
 
             gen_loss = losses.generator_logistic_ns(fake_output)
@@ -167,7 +170,7 @@ class StyleGAN(tf.keras.Model):
 
             reg = tf.zeros((self.args.batch_size_per_replica, 1))
 
-            r1_grads = tf.gradients(tf.math.reduce_sum(real_output), [real_images])[0]
+            r1_grads = tf.gradients(tf.math.reduce_sum(real_output), [real_images_tmp])[0]
             r1_penalty = tf.math.reduce_sum(tf.math.square(r1_grads), axis=[1,2,3,4])
             r1_penalty = r1_penalty[:, tf.newaxis]
             self.training_metrics['r1_reg'](r1_penalty)

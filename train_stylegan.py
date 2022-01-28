@@ -46,11 +46,11 @@ class TrainingArguments:
     tune_target: float = 0.6
     tune_kimg: int = 800
 
-    print_interval: int = 100
-    evaluate_interval: int = 5000
-    log_interval: int = 100
-    metric_interval: int = 5000
-    checkpoint_interval: int = 2000
+    print_interval: int = 1000
+    evaluate_interval: int = 4000
+    log_interval: int = 1000
+    #metric_interval: int = 5000
+    checkpoint_interval: int = 4000
 
 
 def main():
@@ -100,14 +100,15 @@ def main():
 
     # tfrecords = list(Path('/mnt/md0/Pycharm_Raid/datasets/abc/tfrecords/64_filled').rglob('*.tfrecords'))
     tfrecords = ['data/mcb64_screws.tfrecords']
-    train_dataset = dataset.get_mcb_dataset(
-        tfrecords=tfrecords,
-        batch_size=training_args.global_batch_size,
-        repeat=1000,
-        augment_function=None)
+    tf_dataset = dataset.get_mcb_base(tfrecords)
 
-    dist_dataset = strategy.experimental_distribute_dataset(train_dataset)
-    dist_dataset_iterator = iter(dist_dataset)
+    train_dataset = tf_dataset.shuffle(2048, reshuffle_each_iteration=True).repeat(5000).batch(training_args.global_batch_size).prefetch(tf.data.AUTOTUNE)
+    fakelabel_dataset = tf_dataset.map(lambda _, y: y).shuffle(2048, reshuffle_each_iteration=True).repeat(5000).batch(training_args.global_batch_size).prefetch(tf.data.AUTOTUNE)
+    
+    dist_train_dataset = strategy.experimental_distribute_dataset(train_dataset)
+    dist_fakelabel_dataset = strategy.experimental_distribute_dataset(fakelabel_dataset)
+    dist_train_dataset_iterator = iter(dist_train_dataset)
+    dist_fakelabel_dataset_iterator = iter(dist_fakelabel_dataset)
 
     with strategy.scope():
         model = StyleGAN(model_parameters=model_parameters)
@@ -116,14 +117,15 @@ def main():
         model.compile(training_args=training_args)
     
     @tf.function
-    def distributed_train_step(dist_data, dist_labels):
-        strategy.run(model.train_step, args=(dist_data, dist_labels))
+    def distributed_train_step(dist_data, dist_real_labels, dist_fake_labels):
+        strategy.run(model.train_step, args=(dist_data, dist_real_labels, dist_fake_labels))
 
     while int(model.ckpt.seen_images.read_value()) // 1000 < training_args.train_kimg:
 
-        dist_data, dist_labels = next(dist_dataset_iterator)
+        dist_data, dist_real_labels = next(dist_train_dataset_iterator)
+        dist_fake_labels = next(dist_fakelabel_dataset_iterator)
 
-        distributed_train_step(dist_data, dist_labels)
+        distributed_train_step(dist_data, dist_real_labels, dist_fake_labels)
 
         model.update_moving_average()
 
@@ -150,7 +152,7 @@ def main():
             nimg_delta = model.args.apa_interval * model.args.global_batch_size
             nimg_ratio = nimg_delta / (model.args.tune_kimg * 1000)
             deception_strength = model.ckpt.deception_strength.read_value() + nimg_ratio * np.sign(rt - model.args.tune_target)
-            deception_strength = min(max(deception_strength, 0), 0.4)
+            deception_strength = min(max(deception_strength, 0), 0.9)
 
             model.ckpt.deception_strength.assign(deception_strength)
 

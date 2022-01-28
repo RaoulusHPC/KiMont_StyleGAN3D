@@ -164,6 +164,28 @@ def get_labeled_dataset(tfrecords, batch_size: int=1, repeat: int=1, augment_fun
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
+def get_mcb_base(tfrecords):
+    raw_component_dataset = tf.data.TFRecordDataset(tfrecords, compression_type='GZIP')
+
+    # Create a dictionary describing the features.
+    component_feature_description = {
+        'component_raw': tf.io.FixedLenFeature([], tf.string),
+        'label_raw': tf.io.FixedLenFeature([], tf.string),
+    }
+
+    def read_tfrecord(serialized_example):
+        # Parse the input tf.train.Example proto using the dictionary above.
+        example = tf.io.parse_single_example(serialized_example, component_feature_description)
+        component = tf.io.parse_tensor(example['component_raw'], out_type='bool')
+        component = tf.cast(component, 'float32')
+        component = 2 * component - 1
+        component = component[..., tf.newaxis]
+        label = tf.io.parse_tensor(example['label_raw'], out_type='float32')
+        return component, label
+
+    dataset = raw_component_dataset.map(read_tfrecord)
+    return dataset
+
 def get_mcb_dataset(tfrecords, batch_size: int=1, repeat: int=1, augment_function: callable=None):
     raw_component_dataset = tf.data.TFRecordDataset(tfrecords, compression_type='GZIP')
 

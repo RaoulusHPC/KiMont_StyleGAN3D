@@ -29,13 +29,19 @@ manager = tf.train.CheckpointManager(
     directory='./tf_ckpts',
     max_to_keep=None)
 
-storage = []
-for checkpoint in manager.checkpoints[::10]:
+logger1 = tf.summary.create_file_writer('logs/metrics/sag_fid')
+logger2 = tf.summary.create_file_writer('logs/metrics/axi_fid')
+logger3 = tf.summary.create_file_writer('logs/metrics/cor_fid')
+
+for checkpoint in manager.checkpoints[::2]:
     ckpt.restore(checkpoint).expect_partial()
-    print(int(ckpt.seen_images // 1000))
+    seen_k_images = int(ckpt.seen_images // 1000)
+    print(seen_k_images)
     # screenshot_fid = calculate_screenshot_fid(model.mapping_network_ema, model.generator_ema, 10_000, real_dataset, 64)
-    slice_fids = calculate_slice_fid(model.generator_ema, 21_000, real_dataset, 64)
-    storage.append(slice_fids)
-    
-for fid in storage:
-    print(fid)
+    sag_fid, axi_fid, cor_fid = calculate_slice_fid(model.generator_ema, 2, real_dataset, 64)
+    with logger1.as_default():
+        tf.summary.scalar(name='slice-wise-fids', data=sag_fid, step=seen_k_images)
+    with logger2.as_default():
+        tf.summary.scalar(name='slice-wise-fids', data=axi_fid, step=seen_k_images)
+    with logger3.as_default():
+        tf.summary.scalar(name='slice-wise-fids', data=cor_fid, step=seen_k_images)

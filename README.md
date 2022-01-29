@@ -6,5 +6,5 @@ docker build -t stylegan3d \
   --build-arg USER_ID=$(id -u) \
   --build-arg GROUP_ID=$(id -g) .
 
-docker run --gpus all --rm -it -v "$(pwd):/stylegan3d" stylegan3d bash 
+docker run --gpus all -it -v "$(pwd):/stylegan3d" --ipc=host stylegan3d
 

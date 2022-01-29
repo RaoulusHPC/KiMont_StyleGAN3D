@@ -39,8 +39,10 @@ class LatentOptimizer(tf.Module):
         generator,
         comparator,
         steps=200,
-        grab_lambdas=(1., 0.),
-        l2_lambda=0.1,
+        lr=0.01,
+        lambda0=1.0,
+        lambda1=0.0,
+        l2_lambda=0.5,
         save_intermediate_image_every=10,
         filepath=''):
 
@@ -48,16 +50,17 @@ class LatentOptimizer(tf.Module):
         self.generator = generator
         self.comparator = comparator
         self.steps = steps
-        self.grab_lambdas = grab_lambdas
+        self.lr = lr
+        self.lambda0 = lambda0
+        self.lambda1 = lambda1
         self.l2_lambda = l2_lambda
         self.save_intermediate_image_every = save_intermediate_image_every
         self.filepath = filepath
 
     def optimize(self, w):
 
-        self.optimizer = Adam(learning_rate=OptimizationSchedule(steps=self.steps))
-        self.loss_object1 = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-        self.loss_object2 = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        self.optimizer = Adam(learning_rate=OptimizationSchedule(steps=self.steps, max_learning_rate=self.lr))
+        self.loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         if len(w.shape) == 2:
             w = tf.tile(tf.expand_dims(w, axis=1), [1, self.generator.num_ws, 1])
@@ -77,8 +80,9 @@ class LatentOptimizer(tf.Module):
                 self.images.append(optimized_image)
 
         #screenshot_and_save(self.images, filepath=self.filepath, shape=(1, len(self.images)), window_size=(512 * len(self.images), 512))
-        changes = tf.where((optimized_image - self.original_image) > 0, 1., -1.)
-        screenshot_and_save([self.original_image, optimized_image, changes], filepath=self.filepath, shape=(1, 3), window_size=(1536, 512))
+        #changes = tf.where((optimized_image - self.original_image) > 0, 1., -1.)
+        #screenshot_and_save([self.original_image, optimized_image, changes], filepath=self.filepath, shape=(1, 3), window_size=(3000, 1000))
+        optimized_image = tf.where(optimized_image > 0, 1.0, -1.0)
         return optimized_image, self.w_opt
 
     @tf.function
@@ -86,11 +90,14 @@ class LatentOptimizer(tf.Module):
 
         with tf.GradientTape() as tape:
             optimized_image = self.generator.synthesize(self.w_opt, broadcast=False)
-            comparison_logits1 = self.comparator(self.original_image, optimized_image, training=False)
-            comparison_logits2 = self.comparator(optimized_image, self.original_image, training=False)
-            grab_loss1 = self.loss_object1(tf.zeros_like(comparison_logits1), comparison_logits1)
-            grab_loss2 = self.loss_object2(tf.ones_like(comparison_logits2), comparison_logits2)
-            grab_loss = self.grab_lambdas[0] * grab_loss1 +  self.grab_lambdas[1] * grab_loss2
+
+            comparison_logits0 = self.comparator((self.original_image, optimized_image), training=False)
+            grab0_loss = self.loss_object(tf.zeros_like(comparison_logits0), comparison_logits0)
+
+            comparison_logits1 = self.comparator((optimized_image, self.original_image), training=False)
+            grab1_loss = self.loss_object(tf.ones_like(comparison_logits1), comparison_logits1)
+            
+            grab_loss = self.lambda0 * grab0_loss + self.lambda1 * grab1_loss 
             l2_loss = tf.math.reduce_sum(tf.math.square(self.w_opt - self.w_init))
             loss = grab_loss + self.l2_lambda * l2_loss
 

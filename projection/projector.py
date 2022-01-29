@@ -37,7 +37,7 @@ class LatentProjector(tf.Module):
     def __init__(
         self,
         generator,
-        space='W+',
+        space='W',
         noise=0.05,
         noise_ramp=0.75,
         steps=1000,

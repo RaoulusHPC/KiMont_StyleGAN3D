@@ -42,7 +42,7 @@ if __name__ == "__main__":
     comparator = Comparator()
     comparator_input = tf.zeros(shape=(1, 64, 64, 64, 1))
     comparator(comparator_input, comparator_input)
-    comparator.load_weights('tf_ckpt_comparator/')
+    comparator.load_weights('ckpts/comparator/')
     comparator.trainable = False
 
     # temp_dataset = dataset.get_simplegrab_dataset('data/simpleGRAB_1000.tfrecords')
@@ -54,14 +54,14 @@ if __name__ == "__main__":
     for d in train_dataset:
         original_image, generated_image, label, w = d
             
-        optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(1., 0.), filepath=f'{c}test10.png')
+        optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(1., 0.), filepath=f'optimization/results/latentopt{c}.png')
         optimized_image, w_opt = optimizer.optimize(w)
 
-        optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(0., 1.), filepath=f'{c}test01.png')
-        optimized_image, w_opt = optimizer.optimize(w)
+        # optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(0., 1.), filepath=f'{c}test01.png')
+        # optimized_image, w_opt = optimizer.optimize(w)
 
-        optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(0.5, 0.5), filepath=f'{c}test11.png')
-        optimized_image, w_opt = optimizer.optimize(w)
+        # optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(0.5, 0.5), filepath=f'{c}test11.png')
+        # optimized_image, w_opt = optimizer.optimize(w)
 
         c += 1
         if c == 5:

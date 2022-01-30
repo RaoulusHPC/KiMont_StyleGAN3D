@@ -11,3 +11,4 @@ cache
 *.png
 optimization/results
 ckpts
+data

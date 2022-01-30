@@ -20,7 +20,7 @@ if __name__ == "__main__":
     tfrecords = ['data/projected_images.tfrecords']
     tf_dataset = dataset.get_projected_dataset(tfrecords)
 
-    tf_dataset = tf_dataset.map(lambda o, g, l, w : (g, w))
+    tf_dataset = tf_dataset.map(lambda o, g, l, w : (o, g, w))
     test_dataset = tf_dataset.take(1000).batch(1)
     
     # c = 0
@@ -58,10 +58,10 @@ if __name__ == "__main__":
     mapper.load_weights('tf_ckpt_mapper/')
 
     c = 0
-    for generated_image, w in test_dataset:
+    for original_image, generated_image, w in test_dataset:
         optimized_image = generator.synthesize(w + mapper(w))
-        changes = tf.where((optimized_image - generated_image) > 0, 1., -1.)
-        visualize.screenshot_and_save([generated_image, optimized_image, changes], filepath=f'lm{c}.png', shape=(1, 3), window_size=(1536, 512))
+        changes = tf.where((optimized_image - original_image) > 0, 1., -1.)
+        visualize.screenshot_and_save([original_image, generated_image, optimized_image, changes], filepath=f'optimization/results/latentmapper{c}.png', shape=(1, 3), window_size=(3000, 1000))
         c += 1
-        if c == 5:
+        if c == 100:
             break

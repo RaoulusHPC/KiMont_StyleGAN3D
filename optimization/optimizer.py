@@ -32,32 +32,40 @@ class OptimizationSchedule(LearningRateSchedule):
         return self.max_learning_rate * lr_ramp
 
 
+def protected(V, S):
+    f = 0
+    return tf.where(S == f, V, S)
+
 class LatentOptimizer(tf.Module):
 
     def __init__(
         self,
         generator,
         comparator,
+        protection='soft',
         steps=200,
         lr=0.01,
         lambda0=1.0,
         lambda1=0.0,
-        l2_lambda=0.5,
+        l2_lambda=2.0,
+        lambda_p=1.0,
         save_intermediate_image_every=10,
         filepath=''):
 
         super(LatentOptimizer, self).__init__()
         self.generator = generator
         self.comparator = comparator
+        self.protection = protection
         self.steps = steps
         self.lr = lr
         self.lambda0 = lambda0
         self.lambda1 = lambda1
         self.l2_lambda = l2_lambda
+        self.lambda_p = lambda_p
         self.save_intermediate_image_every = save_intermediate_image_every
         self.filepath = filepath
 
-    def optimize(self, w):
+    def optimize(self, w, S=None):
 
         self.optimizer = Adam(learning_rate=OptimizationSchedule(steps=self.steps, max_learning_rate=self.lr))
         self.loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -70,6 +78,7 @@ class LatentOptimizer(tf.Module):
         # Original Image
         self.original_image = self.generator.synthesize(w, broadcast=False)
         self.images = [self.original_image]
+        self.S = S
 
         progress_bar = tqdm(range(1, self.steps+1))
         for i in progress_bar:
@@ -83,7 +92,7 @@ class LatentOptimizer(tf.Module):
         #changes = tf.where((optimized_image - self.original_image) > 0, 1., -1.)
         #screenshot_and_save([self.original_image, optimized_image, changes], filepath=self.filepath, shape=(1, 3), window_size=(3000, 1000))
         optimized_image = tf.where(optimized_image > 0, 1.0, -1.0)
-        return optimized_image, self.w_opt
+        return optimized_image, self.w_opt, loss
 
     @tf.function
     def optimization_step(self):
@@ -91,6 +100,9 @@ class LatentOptimizer(tf.Module):
         with tf.GradientTape() as tape:
             optimized_image = self.generator.synthesize(self.w_opt, broadcast=False)
 
+            if self.protection == 'hard' and self.S is not None:
+                optimized_image = protected(optimized_image, self.S)
+                
             comparison_logits0 = self.comparator((self.original_image, optimized_image), training=False)
             grab0_loss = self.loss_object(tf.zeros_like(comparison_logits0), comparison_logits0)
 
@@ -98,8 +110,13 @@ class LatentOptimizer(tf.Module):
             grab1_loss = self.loss_object(tf.ones_like(comparison_logits1), comparison_logits1)
             
             grab_loss = self.lambda0 * grab0_loss + self.lambda1 * grab1_loss 
-            l2_loss = tf.math.reduce_sum(tf.math.square(self.w_opt - self.w_init))
+            l2_loss = tf.math.reduce_mean(tf.math.square(self.w_opt - self.w_init))
             loss = grab_loss + self.l2_lambda * l2_loss
+
+            if self.S is not None:
+                protected_image = protected(optimized_image, self.S)
+                p_loss = tf.math.reduce_mean(tf.math.square(protected_image - optimized_image))
+                loss += self.lambda_p * p_loss
 
         gradient = tape.gradient(loss, self.w_opt)
         self.optimizer.apply_gradients([(gradient, self.w_opt)])

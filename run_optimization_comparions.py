@@ -68,16 +68,16 @@ if __name__ == "__main__":
         plots = [original_image]
         visualize.screenshot_and_save([original_image], filepath=os.path.join(save_dir, 'original.png'), window_size=(1000, 1000))
 
-        optimizer = LatentOptimizer(generator, comparator, steps=200, lambda0=1., lambda1=0., l2_lambda=0.25)
-        optimized_image, w_opt = optimizer.optimize(w)
+        optimizer = LatentOptimizer(generator, comparator, steps=200, lambda0=1., lambda1=0.)
+        optimized_image, _, _ = optimizer.optimize(w)
         plots.append(optimized_image)
         visualize.screenshot_and_save([optimized_image], filepath=os.path.join(save_dir, 'grab0.png'), window_size=(1000, 1000))
-        optimizer = LatentOptimizer(generator, comparator, steps=200, lambda0=0., lambda1=1., l2_lambda=0.25)
-        optimized_image, w_opt = optimizer.optimize(w)
+        optimizer = LatentOptimizer(generator, comparator, steps=200, lambda0=0., lambda1=1.)
+        optimized_image, _, _ = optimizer.optimize(w)
         plots.append(optimized_image)
         visualize.screenshot_and_save([optimized_image], filepath=os.path.join(save_dir, 'grab1.png'), window_size=(1000, 1000))
-        optimizer = LatentOptimizer(generator, comparator, steps=200, lambda0=0.5, lambda1=0.5, l2_lambda=0.25)
-        optimized_image, w_opt = optimizer.optimize(w)
+        optimizer = LatentOptimizer(generator, comparator, steps=200, lambda0=0.5, lambda1=0.5)
+        optimized_image, _, _ = optimizer.optimize(w)
         plots.append(optimized_image)
         visualize.screenshot_and_save([optimized_image], filepath=os.path.join(save_dir, 'grab.png'), window_size=(1000, 1000))
 
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         # visualize.screenshot_and_save([optimized_image], filepath=os.path.join(save_dir, 'mapper_grab.png'), window_size=(1000, 1000))
 
         # filepath = f'{results_dir}/{c}.png'
-        visualize.screenshot_and_save(plots[::-1], filepath=os.path.join(save_dir, 'mapper_grab0_grab1_grab.png'), shape=(1, len(plots)), window_size=(len(plots) * 1000, 1000))
+        visualize.screenshot_and_save(plots[::-1], filepath=os.path.join(save_dir, 'opt_grab0_grab1_grab.png'), shape=(1, len(plots)), window_size=(len(plots) * 1000, 1000))
 
         # optimized_image = generator.synthesize(w + mapper_grab(w))
         # visualize.screenshot_and_save([optimized_image], filepath=f'{dir}/map_grab.png', window_size=(1000, 1000))

@@ -15,15 +15,7 @@ if __name__ == "__main__":
 
     train_dataset = dataset.get_projected_dataset('data/projected_images.tfrecords')
     train_dataset = train_dataset.batch(1)
-    train_dataset = train_dataset.skip(5)
-
-    for d in train_dataset:
-        original_image, generated_image, label, w = d
-        if tf.math.reduce_mean(tf.math.square(original_image - generated_image)) < 0.005:
-            break
-    
-    def binarize(image):
-        return tf.where(image > 0., 1., -1.)
+    train_dataset = train_dataset.skip(5021)
 
     model = StyleGAN(model_parameters=ModelParameters())
     model.build()
@@ -33,7 +25,7 @@ if __name__ == "__main__":
         generator_ema=model.generator_ema)
     manager = tf.train.CheckpointManager(
         ckpt,
-        directory='./tf_ckpts',
+        directory='./ckpts/stylegan/',
         max_to_keep=None)
     ckpt.restore(manager.latest_checkpoint).expect_partial()
     model.trainable = False
@@ -41,8 +33,8 @@ if __name__ == "__main__":
     # visualize.visualize_tensors([original_image, generated_image, binarize(generated_image)], shape=(1, 3))
     comparator = Comparator()
     comparator_input = tf.zeros(shape=(1, 64, 64, 64, 1))
-    comparator(comparator_input, comparator_input)
-    comparator.load_weights('ckpts/comparator/')
+    comparator((comparator_input, comparator_input))
+    comparator.load_weights('./ckpts/comparator/')
     comparator.trainable = False
 
     # temp_dataset = dataset.get_simplegrab_dataset('data/simpleGRAB_1000.tfrecords')
@@ -53,9 +45,24 @@ if __name__ == "__main__":
     c = 0
     for d in train_dataset:
         original_image, generated_image, label, w = d
-            
-        optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(1., 0.), filepath=f'optimization/results/latentopt{c}.png')
-        optimized_image, w_opt = optimizer.optimize(w)
+        
+        from optimization.optimizer import protected
+        S = original_image[:, :, :, :48, :]
+        S = tf.concat([S, tf.zeros((1, 64, 64, 16, 1))], axis=3)
+        # S = tf.concat([tf.zeros((1, 64, 64, 12, 1)), S], axis=3)
+        visualize.visualize_tensors([protected(tf.ones_like(original_image), S), S, original_image], shape=(1, 3), window_size=(3000, 1000))
+        #continue
+        loss = 1.
+        while loss > 0.1:
+            optimizer = LatentOptimizer(model.generator_ema, comparator)
+            optimized_image, w_opt, loss = optimizer.optimize(w)
+        loss = 1.
+        while loss > 0.1:
+            optimizer = LatentOptimizer(model.generator_ema, comparator, protection='hard')
+            optimized_image_protected, w_opt, loss = optimizer.optimize(w, S)
+        visualize.visualize_tensors([optimized_image_protected, optimized_image, S, original_image], shape=(1, 4), window_size=(4000, 1000))
+        visualize.screenshot_and_save([optimized_image_protected, optimized_image, S, original_image], filepath='results/optimization/protec_hard2.png', shape=(1, 4), window_size=(4000, 1000))
+
 
         # optimizer = LatentOptimizer(model.generator_ema, comparator, steps=200, grab_lambdas=(0., 1.), filepath=f'{c}test01.png')
         # optimized_image, w_opt = optimizer.optimize(w)

@@ -14,14 +14,14 @@ def visualize_npy_file(file):
     visualize_tensors(tensor)
 
 
-def visualize_tensors(tensors, shape: tuple=None, shade: bool=True):
+def visualize_tensors(tensors, shape: tuple=None, shade: bool=True, window_size=None):
     if not shape:
         dim = sqrt(len(tensors))
         shape = (ceil(dim), floor(dim)) # As close to a quadrilateral as possible
     plotter = pv.Plotter(shape=shape)
     plotter.set_background('white')
     _add_tensors_to_plotter(plotter, tensors, shape, shade)
-    plotter.show()
+    plotter.show(window_size=window_size)
 
 
 def rescale_tensor(tensor, new_max=1, new_min=0):

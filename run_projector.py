@@ -1,5 +1,6 @@
 
 import argparse
+import os
 import numpy as np
 import tensorflow as tf
 
@@ -9,13 +10,6 @@ from projection.projector import LatentProjector
 from train_stylegan import ModelParameters
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--file_path", type=str, default="data/example.npy", help="path to image")
-    parser.add_argument("--ckpt", type=str, default="../pretrained_models/stylegan2-ffhq-config-f.pt", help="pretrained StyleGAN2 weights")
-    parser.add_argument("--screenshot", type=bool, default=False, help="whether to save a screenshot of the result")
-    parser.add_argument("--results_dir", type=str, default="results")
-
-    args = parser.parse_args()
 
     # Load stylegan 
 
@@ -28,7 +22,7 @@ if __name__ == "__main__":
         generator_ema=model.generator_ema)
     manager = tf.train.CheckpointManager(
         ckpt,
-        directory='./tf_ckpts',
+        directory='./ckpts/stylegan/',
         max_to_keep=None)
 
     ckpt.restore(manager.latest_checkpoint).expect_partial()
@@ -47,20 +41,36 @@ if __name__ == "__main__":
     #     # visualize.visualize_tensors([data])
     #     break
 
+    save_dir = f'./results/inversion'
+    os.makedirs(save_dir, exist_ok=True)
+
     c = 0
     b = 0
+
     for data, label in train_dataset:
-        print('extended W+')
-        projector = LatentProjector(model.generator_ema, steps=500, noise=0.01, screenshot=False)
-        projector.init_w(label, w_avg_samples=10_000)
-        loss1, generated_image = projector.project(data)
+        # print('extended W+')
+        # projector = LatentProjector(model.generator_ema, steps=500, noise=0.01, screenshot=False)
+        # projector.init_w(label, w_avg_samples=10_000)
+        # loss1, generated_image = projector.project(data)
         print('W')
+        projector = LatentProjector(model.generator_ema, space='W', steps=1000, noise=0.01, screenshot=False)
+        projector.init_w(label, w_avg_samples=10_000)
+        loss2, generated_image = projector.project(data)
+
         projector = LatentProjector(model.generator_ema, space='W', steps=500, noise=0.01, screenshot=False)
         projector.init_w(label, w_avg_samples=10_000)
         loss2, generated_image = projector.project(data)
 
-        if loss1 < loss2:
-            b += 1
+        projector = LatentProjector(model.generator_ema, space='W', steps=250, noise=0.01, screenshot=False)
+        projector.init_w(label, w_avg_samples=10_000)
+        loss2, generated_image = projector.project(data)
+
+        save_filepath = os.path.join(save_dir, str(c))
+        os.makedirs(save_dir, exist_ok=True)
+        visualize.screenshot_and_save([generated_image, data], filepath=save_filepath, shape=(1, 2), window_size=(2000, 1000))
+
+        # if loss1 < loss2:
+        #     b += 1
         c += 1
         if c > 100:
             break

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import tensorflow as tf
 from training.visualize import visualize_tensors
 
@@ -8,12 +10,17 @@ import train_stylegan
 
 model_parameters = train_stylegan.ModelParameters()
 
-tfrecords = ['data/mcb64_screws.tfrecords']
-real_dataset = dataset.get_mcb_dataset(
-    tfrecords=tfrecords,
-    batch_size=64,
-    repeat=1,
-    augment_function=None)
+dataset_name = 'ABC'
+if dataset_name == 'MCB':
+    tfrecords = ['data/mcb64_screws.tfrecords']
+    tf_dataset = dataset.get_mcb_base(tfrecords)
+    model_parameters.label_size = 9
+elif dataset_name == 'ABC':
+    tfrecords = list(Path('data/abc/').rglob('*.tfrecords'))
+    tf_dataset = dataset.get_abc_base(tfrecords)
+
+train_dataset = tf_dataset.take(50000).batch(64).prefetch(tf.data.AUTOTUNE)
+
     
 model = StyleGAN(model_parameters=model_parameters)
 model.build()
@@ -33,12 +40,12 @@ logger1 = tf.summary.create_file_writer('logs/metrics/sag_fid')
 logger2 = tf.summary.create_file_writer('logs/metrics/axi_fid')
 logger3 = tf.summary.create_file_writer('logs/metrics/cor_fid')
 
-for checkpoint in manager.checkpoints[::2]:
+for checkpoint in manager.checkpoints[::1]:
     ckpt.restore(checkpoint).expect_partial()
     seen_k_images = int(ckpt.seen_images // 1000)
     print(seen_k_images)
     # screenshot_fid = calculate_screenshot_fid(model.mapping_network_ema, model.generator_ema, 10_000, real_dataset, 64)
-    sag_fid, axi_fid, cor_fid = calculate_slice_fid(model.generator_ema, 2, real_dataset, 64)
+    sag_fid, axi_fid, cor_fid = calculate_slice_fid(model.generator_ema, 1, train_dataset, 64)
     with logger1.as_default():
         tf.summary.scalar(name='slice-wise-fids', data=sag_fid, step=seen_k_images)
     with logger2.as_default():

@@ -18,6 +18,7 @@ if dataset_name == 'MCB':
 elif dataset_name == 'ABC':
     tfrecords = list(Path('data/abc/').rglob('*.tfrecords'))
     tf_dataset = dataset.get_abc_base(tfrecords)
+    model_parameters.label_size = 0
 
 train_dataset = tf_dataset.take(50000).batch(64).prefetch(tf.data.AUTOTUNE)
 
@@ -33,12 +34,12 @@ ckpt = tf.train.Checkpoint(
     generator_ema=model.generator_ema)
 manager = tf.train.CheckpointManager(
     ckpt,
-    directory='./tf_ckpts',
+    directory='./ckpts/stylegan_abc',
     max_to_keep=None)
 
-logger1 = tf.summary.create_file_writer('logs/metrics/sag_fid')
-logger2 = tf.summary.create_file_writer('logs/metrics/axi_fid')
-logger3 = tf.summary.create_file_writer('logs/metrics/cor_fid')
+logger1 = tf.summary.create_file_writer('logs/metrics/abc/sag_fid')
+logger2 = tf.summary.create_file_writer('logs/metrics/abc/axi_fid')
+logger3 = tf.summary.create_file_writer('logs/metrics/abc/cor_fid')
 
 for checkpoint in manager.checkpoints[::1]:
     ckpt.restore(checkpoint).expect_partial()

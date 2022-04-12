@@ -15,7 +15,9 @@ if __name__ == "__main__":
 
     train_dataset = dataset.get_projected_dataset('data/projected_images.tfrecords')
     train_dataset = train_dataset.batch(1)
-    train_dataset = train_dataset.skip(5021)
+    train_dataset = train_dataset.skip(6100)
+    # train_dataset = train_dataset.skip(5021)
+    # train_dataset = train_dataset.skip(5052)
 
     model = StyleGAN(model_parameters=ModelParameters())
     model.build()
@@ -41,8 +43,19 @@ if __name__ == "__main__":
     # temp_dataset = temp_dataset.batch(1)
     # for components, label in temp_dataset:
     #     print(comparator(components[0], components[1], training=False), comparator(components[1], components[0], training=False)) 
-
+    from optimization.optimizer import protected
+    I = tf.keras.layers.ZeroPadding3D()(tf.ones((1, 62, 62, 62, 1)))
+    S = I[:, :, :, :32]
+    S = tf.concat([S, tf.zeros((1, 64, 64, 32, 1))], axis=3)
+    O = I[:, :, :32]
+    O = tf.concat([O, tf.zeros((1, 64, 32, 64, 1))], axis=2)
+    # S = tf.concat([tf.zeros((1, 64, 64, 12, 1)), S], axis=3)
+    visualize.screenshot_and_save([protected(O, S), S, O, I], filepath='protect.png', shape=(1, 4), window_size=(4000, 1000))
+    #continue
     c = 0
+    for d in train_dataset:
+        c+=1
+    print(c)
     for d in train_dataset:
         original_image, generated_image, label, w = d
         
@@ -50,12 +63,14 @@ if __name__ == "__main__":
         S = original_image[:, :, :, :48, :]
         S = tf.concat([S, tf.zeros((1, 64, 64, 16, 1))], axis=3)
         # S = tf.concat([tf.zeros((1, 64, 64, 12, 1)), S], axis=3)
-        visualize.visualize_tensors([protected(tf.ones_like(original_image), S), S, original_image], shape=(1, 3), window_size=(3000, 1000))
+        #visualize.visualize_tensors([protected(tf.ones_like(original_image), S), S, original_image], shape=(1, 3), window_size=(3000, 1000))
         #continue
         loss = 1.
         while loss > 0.1:
             optimizer = LatentOptimizer(model.generator_ema, comparator)
             optimized_image, w_opt, loss = optimizer.optimize(w)
+            # optimizer = LatentOptimizer(model.generator_ema, comparator)
+            # optimized_image, w_opt, loss = optimizer.optimize(w_opt)
         loss = 1.
         while loss > 0.1:
             optimizer = LatentOptimizer(model.generator_ema, comparator, protection='hard')

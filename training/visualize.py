@@ -52,7 +52,7 @@ def _add_tensors_to_plotter(plotter: pv.Plotter, tensors, shape: tuple, shade: b
                 tensor = tensors.pop()
                 tensor = np.squeeze(np.array(tensor))
                 plotter.subplot(i, j)
-                plotter.add_volume(tensor, cmap="viridis", shade=shade)
+                plotter.add_volume(tensor, cmap="viridis", shade=shade, show_scalar_bar=False)
 
 
 class Screenshotter:

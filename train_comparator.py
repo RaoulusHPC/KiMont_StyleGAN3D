@@ -75,23 +75,6 @@ with strategy.scope():
     opt = tf.keras.optimizers.Adam(learning_rate=learning_rate, epsilon=parameters.adam_eps)
     comparator.compile(optimizer=opt, loss=losses.BinaryCrossentropy(from_logits=True), metrics=['accuracy'])
 
-from training.visualize import visualize_tensors
-# tfrecords = ['data/labeled_data_filled.tfrecords']
-# tf_dataset = dataset.get_labeled_dataset(tfrecords)
-# for x, y in tf_dataset:
-#     print(tf.math.argmax(y[0, 1]).numpy())
-#     visualize_tensors([x])
-
-# comparator.load_weights('tf_ckpt_comparator/')
-# for x, y in train_dataset:
-#     x = x[0:1]
-#     y = y[0:1]
-#     # print(y.numpy(), comparator(x, training=False).numpy())
-#     print(y.numpy())
-#     # visualize_tensors([x[..., 0]])
-#     # visualize_tensors([x[..., 1]])
-#     visualize_tensors([x[..., 0], x[..., 1], x[..., int(y.numpy())]], shape=(1, 3))
-
 comparator.fit(
     train_dataset,
     validation_data=val_dataset,

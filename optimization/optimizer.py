@@ -49,7 +49,7 @@ class LatentOptimizer(tf.Module):
         lambda1=0.0,
         l2_lambda=2.0,
         lambda_p=1.0,
-        save_intermediate_image_every=10,
+        save_intermediate_image_every=40,
         filepath=''):
 
         super(LatentOptimizer, self).__init__()
@@ -85,10 +85,10 @@ class LatentOptimizer(tf.Module):
             optimized_image, loss = self.optimization_step()
             progress_bar.set_description(f'loss: {loss.numpy().item():.4f}')
 
-            if self.save_intermediate_image_every > 0 and i % self.save_intermediate_image_every == 0:
+            if self.save_intermediate_image_every < self.steps and i % self.save_intermediate_image_every == 0:
                 self.images.append(optimized_image)
 
-        #screenshot_and_save(self.images, filepath=self.filepath, shape=(1, len(self.images)), window_size=(512 * len(self.images), 512))
+        screenshot_and_save(self.images[::-1], filepath='test.png', shape=(1, len(self.images)), window_size=(1000 * len(self.images), 1000))
         #changes = tf.where((optimized_image - self.original_image) > 0, 1., -1.)
         #screenshot_and_save([self.original_image, optimized_image, changes], filepath=self.filepath, shape=(1, 3), window_size=(3000, 1000))
         optimized_image = tf.where(optimized_image > 0, 1.0, -1.0)

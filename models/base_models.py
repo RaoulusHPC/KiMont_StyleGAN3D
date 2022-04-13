@@ -72,6 +72,7 @@ class LatentMapper(tf.keras.Model):
         delta = self.mapper(w)
         return delta
 
+
 class LabelGuidedMapper(tf.keras.Model):
 
     def __init__(self, n_layers, latent_size):
@@ -193,7 +194,7 @@ class DiscriminatorStatic(tf.keras.Model):
         self.dense0 = EqualizedLinear(self.filters[-1], apply_activ=True)
         self.dense1 = EqualizedLinear(1 if not hasattr(self, 'mapping_fmaps') else self.mapping_fmaps)
 
-    def call(self, images, labels, adrop_strength=0):
+    def call(self, images, labels, adrop_strength=0, minibatch_statistics=False):
 
         if self.label_size > 0:
             labels = self.dense(labels)
@@ -204,7 +205,9 @@ class DiscriminatorStatic(tf.keras.Model):
         for i in range(len(self.blocks)):
             x = self.blocks[i](x, adrop_strength)
 
-        x = self.std_dev(x)
+        x = self.std_dev(x) 
+        std_dev = x[..., 0]
+        tf.print(std_dev)
         x = self.conv(x, adrop_strength)
         x = self.flatten(x)
         x = self.dense0(x, adrop_strength)

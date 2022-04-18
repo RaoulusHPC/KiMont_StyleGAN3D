@@ -206,8 +206,6 @@ class DiscriminatorStatic(tf.keras.Model):
             x = self.blocks[i](x, adrop_strength)
 
         x = self.std_dev(x) 
-        std_dev = x[..., 0]
-        tf.print(std_dev)
         x = self.conv(x, adrop_strength)
         x = self.flatten(x)
         x = self.dense0(x, adrop_strength)
@@ -215,6 +213,17 @@ class DiscriminatorStatic(tf.keras.Model):
         if self.label_size > 0:
             x = tf.math.reduce_sum(x * labels, axis=1, keepdims=True) / np.sqrt(self.mapping_fmaps)
         return x
+
+    def get_minibatch_statistics(self, images, adrop_strength=0.):
+
+        x = self.from_rgb(images, adrop_strength)
+
+        for i in range(len(self.blocks)):
+            x = self.blocks[i](x, adrop_strength)
+
+        x = self.std_dev(x) 
+        std_dev = x[..., 0]
+        return std_dev
 
 
 class Comparator(tf.keras.Model):

@@ -15,7 +15,7 @@ from training import dataset
 class ModelParameters:
     img_dim: int = 64
     latent_size: int = 160
-    label_size: int = 0
+    label_size: int = 9
     num_layers: int = 8
     gen_filters: List = field(default_factory=lambda:[128, 128, 64, 32, 16])
     disc_filters: List = field(default_factory=lambda:[16, 32, 64, 64, 128, 128, 128])
@@ -98,7 +98,7 @@ def main():
 
     model_parameters = ModelParameters()
 
-    dataset_name = 'ABC'
+    dataset_name = 'MCB'
     if dataset_name == 'MCB':
         tfrecords = ['data/mcb64_screws.tfrecords']
         tf_dataset = dataset.get_mcb_base(tfrecords)

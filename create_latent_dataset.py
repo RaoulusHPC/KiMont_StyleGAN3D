@@ -31,7 +31,8 @@ if __name__ == "__main__":
         directory='./tf_ckpts',
         max_to_keep=None)
 
-    ckpt.restore(manager.latest_checkpoint).expect_partial()
+    ckpt.restore('./tf_ckpts/ckpt-20').expect_partial() #manager.latest_checkpoint
+    print("Loaded weights from ckpt-20")
     #image = np.load(args.file_path)
     tfrecords = ['data/mcb64_screws.tfrecords']
     train_dataset = dataset.get_mcb_dataset(

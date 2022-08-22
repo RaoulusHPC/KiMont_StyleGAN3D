@@ -42,7 +42,7 @@ if __name__ == "__main__":
     tfrecords = ['data/projected_images.tfrecords']
     tf_dataset = dataset.get_projected_dataset(tfrecords)
 
-    tf_dataset = tf_dataset.map(lambda o, g, l, w : (g, w))
+    tf_dataset = tf_dataset.map(lambda o, g, l, w : (g, w, l))
     train_dataset = tf_dataset.take(parameters.train_size).shuffle(parameters.train_size, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
     val_dataset = tf_dataset.skip(parameters.train_size).shuffle(parameters.train_size, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)    
 
@@ -149,12 +149,12 @@ if __name__ == "__main__":
         l2_loss_metric.reset_states()
         realism_loss_metric.reset_states()
 
-        for generated_image, w  in train_dataset:
+        for generated_image, w, l  in train_dataset:
             train_step(w, generated_image)
         # with train_summary_writer1.as_default():
         #     tf.summary.scalar('loss', train_loss_metric.result(), step=epoch)
 
-        for generated_image, w in val_dataset:
+        for generated_image, w, l in val_dataset:
             test_step(w, generated_image)
         with test_summary_writer1.as_default():
             tf.summary.scalar('test_loss', test_loss_metric.result(), step=epoch+1)

@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 
 from training.visualize import screenshot_and_save
-
+import time
 
 class ProjectionSchedule(LearningRateSchedule):
     def __init__(self, steps=1000, max_learning_rate=0.1, rampup=0.05, rampdown=0.25):
@@ -39,7 +39,7 @@ class LatentProjector(tf.Module):
         generator,
         space='W',
         noise=0.05,
-        noise_ramp=0.75,
+         noise_ramp=0.75,
         steps=1000,
         screenshot=False):
 
@@ -59,57 +59,97 @@ class LatentProjector(tf.Module):
         self.w_avg = np.mean(w, axis=0, keepdims=True)
         self.w_std = (np.sum((w - self.w_avg) ** 2) / w_avg_samples) ** 0.5
 
-    def get_noise(self, step):
+    def get_noise(self, step, w):
         t = step / self.steps
         noise_strength = self.w_std * self.noise * max(0, 1 - t / self.noise_ramp) ** 2
-        noise = tf.random.normal(self.w.shape) * noise_strength
+        noise = tf.random.normal(w.shape) * noise_strength
         return noise
 
     def project(self, image):
-        
+
         self.optimizer = Adam(learning_rate=ProjectionSchedule(steps=self.steps))
         self.original_image = tf.convert_to_tensor(image, dtype='float32')
-        # initial_value = tf.tile(tf.expand_dims(self.w_avg, axis=1), [1, self.generator.num_ws, 1])
-        # self.w = tf.Variable(initial_value=initial_value)
-        self.w = tf.Variable(initial_value=self.w_avg, trainable=True)
-        w_expanded = tf.tile(tf.expand_dims(self.w_avg, axis=1), [1, self.generator.num_ws, 1])
-        self.delta = tf.Variable(initial_value=0 * w_expanded, trainable= self.space == 'W+')
 
-        progress_bar = tqdm(range(1, self.steps+1))
+
+        w = tf.Variable(initial_value=self.w_avg, trainable=True)
+
+        progress_bar = tqdm(range(1, self.steps + 1))
         for step in progress_bar:
-            noise = self.get_noise(step)
-            generated_image, loss = self.projection_step(noise)
-            progress_bar.set_description(f'loss: {loss.numpy().item():.4f}')
+            noise = self.get_noise(step, w) #
+            w, generated_image, loss,gradients = self.projection_step(w, noise)
+            progress_bar.set_description(f'loss: {loss.numpy().item():.4f}, gradient max : {np.amax(gradients[0]):.4f}, gradient min : {np.amin(gradients[0]):.4f}')
             # if step % 50 == 1:
             #     screenshot_and_save([self.original_image, generated_image], filepath=f'projection/results/projection{step}.png', shape=(1, 2), window_size=1000)
-        
-        if self.screenshot:
-            screenshot_and_save([self.original_image, generated_image], filepath='projection/results/projection.png', shape=(1, 2), window_size=1000)
-        
-        return loss, generated_image
 
-    @tf.function
-    def projection_step(self, noise):
+        if self.screenshot:
+            screenshot_and_save([self.original_image, generated_image], filepath='projection/results/projection.png',
+                                shape=(1, 2), window_size=1000)
+
+        return w, loss, generated_image
+
+    #@tf.function
+    def projection_step(self, w, noise):
 
         with tf.GradientTape() as tape:
-            w_noised = self.w + noise
+            tape.watch(w)
+            w_noised = w + noise
             w_noised = tf.tile(tf.expand_dims(w_noised, axis=1), [1, self.generator.num_ws, 1])
-            w_noised += self.delta
             generated_image = self.generator.synthesize(w_noised, broadcast=False)
             loss = tf.math.reduce_mean(tf.math.square(generated_image - self.original_image))
-            loss += tf.math.reduce_sum(tf.math.square(self.delta))
-            # if self.space == 'W+':
-            #     w_noised  == tf.tile(tf.expand_dims(w_noised, axis=1), [1, self.generator.num_ws, 1])
-            #     w_noised += self.delta
-            #     generated_image = self.generator.synthesize(w_noised, broadcast=False)
-            #     loss = tf.math.reduce_mean(tf.math.square(generated_image - self.original_image))
-            #     loss += tf.math.reduce_sum(tf.math.square(self.delta))
-            # else:
-            #     generated_image = self.generator.synthesize(w_noised)
-            #     loss = tf.math.reduce_mean(tf.math.square(generated_image - self.original_image))
 
-        gradients = tape.gradient(loss, [self.w, self.delta], unconnected_gradients=tf.UnconnectedGradients.ZERO)
-        self.optimizer.apply_gradients(zip(gradients, [self.w, self.delta]))
+        gradients = tape.gradient(loss, [w])
+        self.optimizer.apply_gradients(zip(gradients, [w]))
 
-        return generated_image, loss
+        return w, generated_image, loss, gradients
+
+    # def project(self, image):
+    #
+    #     self.optimizer = Adam(learning_rate=ProjectionSchedule(steps=self.steps))
+    #     self.original_image = tf.convert_to_tensor(image, dtype='float32')
+    #     # initial_value = tf.tile(tf.expand_dims(self.w_avg, axis=1), [1, self.generator.num_ws, 1])
+    #     # self.w = tf.Variable(initial_value=initial_value)
+    #     self.w = tf.Variable(initial_value=self.w_avg, trainable=True)
+    #     w_expanded = tf.tile(tf.expand_dims(self.w_avg, axis=1), [1, self.generator.num_ws, 1])
+    #     self.delta = tf.Variable(initial_value=0 * w_expanded, trainable= self.space == 'W+')
+    #
+    #     progress_bar = tqdm(range(1, self.steps+1))
+    #     for step in progress_bar:
+    #         noise = self.get_noise(step)
+    #         generated_image, loss, gradients = self.projection_step(noise)
+    #         time.sleep(0.2)
+    #         progress_bar.set_description(f'loss: {loss.numpy().item():.4f}, gradient max : {np.amax(gradients[0]):.4f}, gradient min : {np.amin(gradients[0]):.4f}')
+    #         # if step % 50 == 1:
+    #         #     screenshot_and_save([self.original_image, generated_image], filepath=f'projection/results/projection{step}.png', shape=(1, 2), window_size=1000)
+    #
+    #     if self.screenshot:
+    #         screenshot_and_save([self.original_image, generated_image], filepath='projection/results/projection.png', shape=(1, 2), window_size=1000)
+    #
+    #     return self.w, loss, generated_image
+    #
+    # #@tf.function
+    # def projection_step(self, noise):
+    #
+    #     with tf.GradientTape() as tape:
+    #         w_noised = self.w + noise
+    #         w_noised = tf.tile(tf.expand_dims(w_noised, axis=1), [1, self.generator.num_ws, 1])
+    #         w_noised += self.delta
+    #         generated_image = self.generator.synthesize(w_noised, broadcast=False)
+    #         loss = tf.math.reduce_mean(tf.math.square(generated_image - self.original_image))
+    #         loss += tf.math.reduce_sum(tf.math.square(self.delta))
+    #         # if self.space == 'W+':
+    #         #     w_noised  == tf.tile(tf.expand_dims(w_noised, axis=1), [1, self.generator.num_ws, 1])
+    #         #     w_noised += self.delta
+    #         #     generated_image = self.generator.synthesize(w_noised, broadcast=False)
+    #         #     loss = tf.math.reduce_mean(tf.math.square(generated_image - self.original_image))
+    #         #     loss += tf.math.reduce_sum(tf.math.square(self.delta))
+    #         # else:
+    #         #     generated_image = self.generator.synthesize(w_noised)
+    #         #     loss = tf.math.reduce_mean(tf.math.square(generated_image - self.original_image))
+    #
+    #     gradients = tape.gradient(loss, [self.w, self.delta], unconnected_gradients=tf.UnconnectedGradients.ZERO)
+    #     # if(np.mean(gradients[0])) == 0.0:
+    #     #     print('Gradient not existing')
+    #     self.optimizer.apply_gradients(zip(gradients, [self.w, self.delta]))
+    #
+    #     return generated_image, loss, gradients
 

@@ -3,7 +3,7 @@ FROM tensorflow/tensorflow:2.6.1-gpu
 
 ARG USER_ID
 ARG GROUP_ID
-
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
 RUN apt-get update
 RUN apt-get install libgl1-mesa-glx xvfb ffmpeg libsm6 libxext6  -y
 

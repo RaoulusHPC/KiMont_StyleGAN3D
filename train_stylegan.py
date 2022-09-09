@@ -55,7 +55,7 @@ class TrainingArguments:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--use_gpu", type=bool, default=False, help="use GPU")
+    parser.add_argument("--use_gpu", type=bool, default=True, help="use GPU")
     parser.add_argument("--memory_growth", type=bool, default=False, help="use memory growth")
     # parser.add_argument("--data_dir", type=str, default="/mnt/md0/Pycharm_Raid/datasets/mcb/32", help="path to folder containing data")
 
@@ -98,7 +98,7 @@ def main():
 
     model_parameters = ModelParameters()
 
-    dataset_name = 'ABC'
+    dataset_name = 'MCB'
     if dataset_name == 'MCB':
         tfrecords = ['data/mcb64_screws.tfrecords']
         tf_dataset = dataset.get_mcb_base(tfrecords)
@@ -121,7 +121,7 @@ def main():
         model.summary()
         model.compile(training_args=training_args)
     
-    #@tf.function
+    # @tf.function
     def distributed_train_step(dist_data, dist_real_labels, dist_fake_labels):
         strategy.run(model.train_step, args=(dist_data, dist_real_labels, dist_fake_labels))
 
@@ -156,7 +156,8 @@ def main():
             rt = model.training_metrics['loss_signs_real'].result()
             nimg_delta = model.args.apa_interval * model.args.global_batch_size
             nimg_ratio = nimg_delta / (model.args.tune_kimg * 1000)
-            deception_strength = model.deception_strength.read_value() + nimg_ratio * np.sign(rt - model.args.tune_target)
+            # deception_strength = model.deception_strength.read_value() + nimg_ratio * np.sign(rt - model.args.tune_target)
+            deception_strength = model.ckpt.deception_strength.read_value() + nimg_ratio * np.sign(rt - model.args.tune_target)
             deception_strength = min(max(deception_strength, 0), 0.9)
 
             model.ckpt.deception_strength.assign(deception_strength)

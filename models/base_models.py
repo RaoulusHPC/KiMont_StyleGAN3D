@@ -112,11 +112,13 @@ class GeneratorStatic(tf.keras.Model):
 
     def build(self, input_shape):
 
+        # Mapping network to map latent z to the w used in the Synthesis network
         self.mapping_network = MappingNetwork(
             latent_size=self.latent_size,
             label_size=self.label_size,
             num_layers=self.num_layers)
 
+        # Fixed constant that is the actual input of the Synthesis network
         self.initial_constant = self.add_weight(shape=(1, 4, 4, 4, self.filters[0]),
                                                 initializer='random_normal',
                                                 trainable=True,

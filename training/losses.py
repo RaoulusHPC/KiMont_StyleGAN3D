@@ -8,6 +8,9 @@ def generator_logistic_ns(fake):
     loss = tf.nn.softplus(-fake)
     return loss
 
+# 1 ist richtiges
+#0 ist falsches
+
 def discriminator_logistic(real, fake):
     loss = tf.nn.softplus(fake)
     loss += tf.nn.softplus(-real)

@@ -28,7 +28,7 @@ if __name__ == "__main__":
         generator_ema=model.generator_ema)
     manager = tf.train.CheckpointManager(
         ckpt,
-        directory='./tf_ckpts',
+        directory='evia-server-ckpts/v2',
         max_to_keep=None)
 
     ckpt.restore('./tf_ckpts/ckpt-20').expect_partial() #manager.latest_checkpoint
@@ -51,12 +51,21 @@ if __name__ == "__main__":
     train_dataset = train_dataset.take(10_000)
 
     storage = []
+
     for data, label in train_dataset:
         projector = LatentProjector(model.generator_ema, steps=500, noise=0.01, screenshot=False)
         projector.init_w(label, w_avg_samples=10_000)
-        loss, generated_image = projector.project(data)
+        w, loss, generated_image = projector.project(data)
         if loss < 0.02:
-            storage.append((projector.original_image, generated_image, label, projector.w))
+            storage.append((projector.original_image, generated_image, label, w))
+
+
+    # for data, label in train_dataset:
+    #     projector = LatentProjector(model.generator_ema, steps=500, noise=0.01, screenshot=False)
+    #     projector.init_w(label, w_avg_samples=10_000)
+    #     loss, generated_image = projector.project(data)
+    #     if loss < 0.02:
+    #         storage.append((projector.original_image, generated_image, label, projector.w))
 
     def _bytes_feature(value):
         """Returns a bytes_list from a string / byte."""

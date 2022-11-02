@@ -4,6 +4,7 @@ FROM tensorflow/tensorflow:2.6.1-gpu
 ARG USER_ID
 ARG GROUP_ID
 
+
 RUN apt-get update
 RUN apt-get install libgl1-mesa-glx xvfb ffmpeg libsm6 libxext6  -y
 

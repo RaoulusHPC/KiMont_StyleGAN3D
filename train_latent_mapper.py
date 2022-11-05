@@ -151,12 +151,16 @@ if __name__ == "__main__":
         realism_loss_metric.reset_states()
 
         for generated_image, w, l  in train_dataset:
+
             train_step(w, generated_image, l)
+
         # with train_summary_writer1.as_default():
         #     tf.summary.scalar('loss', train_loss_metric.result(), step=epoch)
 
         for generated_image, w, l in val_dataset:
+
             test_step(w, generated_image, l)
+
         with test_summary_writer1.as_default():
             tf.summary.scalar('test_loss', test_loss_metric.result(), step=epoch+1)
             tf.summary.scalar('grab0_loss', grab0_loss_metric.result(), step=epoch+1)

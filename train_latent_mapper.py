@@ -17,9 +17,9 @@ from train_stylegan import ModelParameters
 
 
 class TrainingArguments:
-    epochs: int = 10
+    epochs: int = 50
     batch_size: int = 32
-    learning_rate: float = 0.5
+    learning_rate: float = 0.1
     train_size: int = 5000
     l2_lambda: float = 2.0
 
@@ -29,9 +29,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--lambda0', type=float, default=1.0)
-    parser.add_argument('--lambda1', type=float, default=0.0)
+    parser.add_argument('--lambda1', type=float, default=1.0)
     parser.add_argument('--l2_lambda', type=float, default=2.0)
-    parser.add_argument('--real_lambda', type=float, default=1.0)
+    parser.add_argument('--real_lambda', type=float, default=0.0)
     args = parser.parse_args()
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
     gpus = tf.config.list_physical_devices('GPU')
 
-    tfrecords = ['data/projected_images.tfrecords']
+    tfrecords = ['data/latents.tfrecords']
     tf_dataset = dataset.get_projected_dataset(tfrecords)
 
     tf_dataset = tf_dataset.map(lambda o, g, l, w : (g, w, l))
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         ckpt,
         directory='ckpts/stylegan/',
         max_to_keep=None)
-    ckpt.restore(manager.latest_checkpoint).expect_partial()
+    ckpt.restore('./tf_ckpts/ckpt-20').expect_partial()   #manager.latest_checkpoint
     generator = model.generator_ema
     generator.trainable = False
     discriminator = model.discriminator
@@ -69,8 +69,9 @@ if __name__ == "__main__":
     comparator.load_weights('ckpts/comparator/')
     comparator.trainable = False
 
-    mapper = LatentMapper(generator.latent_size, num_layers=4)
+    mapper = LatentMapper(generator.latent_size, num_layers=3)
     mapper.build((None, generator.latent_size))
+    mapper.load_weights('ckpts/mapper/mapper_2.0_1.0_1.0_0.0/20220816-134422/')
     mapper.summary()
 
     optimizer = Adam(learning_rate=parameters.learning_rate)
@@ -84,9 +85,9 @@ if __name__ == "__main__":
     realism_loss_metric = tf.keras.metrics.Mean(name='realism_loss')
 
     @tf.function
-    def train_step(w, generated_images):
+    def train_step(w, generated_images, l):
         with tf.GradientTape() as tape:
-            delta = 0.1 * mapper(w)
+            delta = mapper(w)
             w_opt = w + delta
             optimized_images = generator.synthesize(w_opt)
 
@@ -98,9 +99,9 @@ if __name__ == "__main__":
 
             l2_loss = tf.math.reduce_mean(tf.math.square(delta))
 
-            realism_loss = tf.nn.softplus(-discriminator(optimized_images))
+            realism_loss = tf.nn.softplus(-discriminator(optimized_images,l))
 
-            loss = grab_loss + args.l2_lambda * l2_loss + args.real_lambda * realism_loss
+            loss = grab_loss + args.l2_lambda * l2_loss #+ args.real_lambda * realism_loss
 
         gradients = tape.gradient(loss, mapper.trainable_variables)
         optimizer.apply_gradients(zip(gradients, mapper.trainable_variables))
@@ -108,8 +109,8 @@ if __name__ == "__main__":
         train_loss_metric(loss)
 
     @tf.function
-    def test_step(w, generated_images):
-        delta = 0.1 * mapper(w)
+    def test_step(w, generated_images, l):
+        delta = mapper(w)
         w_opt = w + delta
         optimized_images = generator.synthesize(w_opt)
 
@@ -121,9 +122,9 @@ if __name__ == "__main__":
 
         l2_loss = tf.math.reduce_mean(tf.math.square(delta))
 
-        realism_loss = tf.nn.softplus(-discriminator(optimized_images))
+        realism_loss = tf.nn.softplus(-discriminator(optimized_images, l))
 
-        loss = grab_loss + args.l2_lambda * l2_loss + args.real_lambda * realism_loss
+        loss = grab_loss + args.l2_lambda * l2_loss  #+ args.real_lambda * realism_loss
 
         test_loss_metric(loss)
         grab0_loss_metric(grab0_loss)
@@ -150,12 +151,16 @@ if __name__ == "__main__":
         realism_loss_metric.reset_states()
 
         for generated_image, w, l  in train_dataset:
-            train_step(w, generated_image)
+
+            train_step(w, generated_image, l)
+
         # with train_summary_writer1.as_default():
         #     tf.summary.scalar('loss', train_loss_metric.result(), step=epoch)
 
         for generated_image, w, l in val_dataset:
-            test_step(w, generated_image)
+
+            test_step(w, generated_image, l)
+
         with test_summary_writer1.as_default():
             tf.summary.scalar('test_loss', test_loss_metric.result(), step=epoch+1)
             tf.summary.scalar('grab0_loss', grab0_loss_metric.result(), step=epoch+1)
@@ -175,4 +180,4 @@ if __name__ == "__main__":
 
 
 
-    
+

@@ -98,7 +98,7 @@ def main():
 
     model_parameters = ModelParameters()
 
-    dataset_name = 'ABC'
+    dataset_name = 'MCB'
     if dataset_name == 'MCB':
         tfrecords = ['data/mcb64_screws.tfrecords']
         tf_dataset = dataset.get_mcb_base(tfrecords)

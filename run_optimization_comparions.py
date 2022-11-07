@@ -12,7 +12,7 @@ from train_stylegan import ModelParameters
 
 if __name__ == "__main__":
 
-    train_dataset = dataset.get_projected_dataset('data/projected_images.tfrecords')
+    train_dataset = dataset.get_projected_dataset('data/latents.tfrecords')
     train_dataset = train_dataset.batch(1)
     train_dataset = train_dataset.skip(5000)
     train_dataset.shuffle(2000)
@@ -42,15 +42,15 @@ if __name__ == "__main__":
 
     mapper_grab = LatentMapper(generator.latent_size, num_layers=4)
     mapper_grab.build((None, generator.latent_size))
-    mapper_grab.load_weights('ckpts/mapper/mapper_2.0_0.5_0.5/20220128-132753/')
+    mapper_grab.load_weights('ckpts/mapper/mapper_2.0_1.0_0.0_0.0/20220812-101635/')
 
     mapper_grab0 = LatentMapper(generator.latent_size, num_layers=4)
     mapper_grab0.build((None, generator.latent_size))
-    mapper_grab0.load_weights('ckpts/mapper/mapper_2.0_1.0_0.0/20220128-120210/')
+    mapper_grab0.load_weights('ckpts/mapper/mapper_2.0_1.0_0.0_0.0/20220812-101635/')
 
     mapper_grab1 = LatentMapper(generator.latent_size, num_layers=4)
     mapper_grab1.build((None, generator.latent_size))
-    mapper_grab1.load_weights('ckpts/mapper/mapper_2.0_0.0_1.0/20220128-123600/')
+    mapper_grab1.load_weights('ckpts/mapper/mapper_2.0_1.0_0.0_0.0/20220812-101635/')
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     results_dir = 'results/optimization/' + current_time

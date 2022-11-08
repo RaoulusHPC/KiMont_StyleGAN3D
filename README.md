@@ -25,7 +25,13 @@ dataset.
 5. We now have all the different sub-models, in order to train the latent mapper. The latent mapper will make small changes to the latent representation of a CAD model,
 in order to improve it in some aspect. For the training, we need the latent dataset, the StyleGAN in order to go convert latent codes to CAD models and the 
 comparator to guide the latent mapper.
-6 To be continued..
+6. In order to optimize the CAD models, one has two possibilities:
+  - Using the trained **latent mapper** we can calculate the changes that have to be made to the original w, in order to 
+get a better can model respective to the desired property
+  - One can improve the latent code of the CAD model by using the guidance from the **comparator**. This means that no latent mapper is needed. Based
+on the output of the comparator, we can backpropagate the error to the input latent code and adapt it according to the gradient.
+This process is done iteratively, until the error from the comparator is minimized. 
+
 
 ### Docker installation
 https://dille.name/blog/2018/07/16/handling-file-permissions-when-writing-to-volumes-from-docker-containers/

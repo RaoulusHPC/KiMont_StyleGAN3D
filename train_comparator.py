@@ -42,8 +42,8 @@ if len(gpus) > 2:
     strategy = tf.distribute.MirroredStrategy()
 else:
     strategy = tf.distribute.get_strategy()
-
-tfrecords = ['data/simpleGRAB_1000.tfrecords']
+tfrecords = list(Path('data_toolbox/output/').rglob('*.tfrecords'))
+#tfrecords = ['data/simpleGRAB_1000.tfrecords']
 tf_dataset = dataset.get_simplegrab_dataset(tfrecords)
 
 val_dataset = tf_dataset.take(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
@@ -51,7 +51,7 @@ val_dataset = strategy.experimental_distribute_dataset(val_dataset)
 train_dataset = tf_dataset.skip(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).map(lambda x, y: dataset.simple_grab_aug(x, y)).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
 train_dataset = strategy.experimental_distribute_dataset(train_dataset)
 
-checkpoint_dir = 'ckpts/comparator/'
+checkpoint_dir = 'ckpts/comparator_newdataset/'
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_dir,
         save_freq='epoch',
@@ -61,7 +61,7 @@ checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         save_best_only=True)
 
 tensorboard_callback = tf.keras.callbacks.TensorBoard(
-    log_dir='logs/comparator'
+    log_dir='logs/comparator_newdataset'
 )
 
 with strategy.scope():

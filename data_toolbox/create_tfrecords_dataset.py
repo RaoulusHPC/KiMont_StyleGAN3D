@@ -22,6 +22,7 @@ from scipy.ndimage import zoom
 import multiprocessing as mp
 from tqdm import tqdm
 from collections import deque
+import traceback
 
 ######################
 
@@ -61,18 +62,16 @@ def float_feature_list(value):
     return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
 
-def serialize_example(part1, part2, label): #part
-    encoded_part1_bytes = tf.io.serialize_tensor(part1)
-    encoded_part2_bytes = tf.io.serialize_tensor(part2)
+def serialize_example(part, label): #part
+    encoded_part_bytes = tf.io.serialize_tensor(part)
     #part_bytes = tf.io.serialize_tensor(part)
     # attributes_bytes = tf.io.serialize_tensor(attributes)
     # name_bytes = tf.io.serialize_tensor(name)
     # category_bytes = tf.io.serialize_tensor(category)
 
     feature = {
-        "component1_raw": bytes_feature(encoded_part1_bytes),
-        "component2_raw": bytes_feature(encoded_part2_bytes),
-        "label": float_feature(label),
+        "component_raw": bytes_feature(encoded_part_bytes),
+        "label_raw": float_feature(label),
     }
     return tf.train.Example(features=tf.train.Features(feature=feature)).SerializeToString()
 
@@ -98,54 +97,44 @@ def parse_tfrecord_fn(example):
 
 
 def write_to_dataset_worker(thread_number):
-    record_file = './output_6.12.22/comparator_IFC_dataset_part_{}.tfrecords'.format(thread_number)
+    record_file = './output_ranjit_dataset/comparator_IFC_dataset_part_{}.tfrecords'.format(thread_number)
     # parts_path = r"D:\data-toolbox\data\parts"
     global count
     with tf.io.TFRecordWriter(record_file, options) as writer:
-        while not combinations.empty():
-            combination = combinations.get()
+        while not parts.empty():
+            part = parts.get()
 
             try:
-                data_filename1 = str(combination[0]).split("/")[-1]
-                data_filename2 = str(combination[1]).split("/")[-1]
+                data_filename = str(part).split("/")[-1]
+                label_filename =label_preposition +  data_filename.replace('.npy', '.xml')
+                label_filepath = os.path.join(labels_path, label_filename) #parts_path.replace("parts", "xml")
 
-                label_filename1 =label_preposition +  data_filename1.replace('.npy', '.xml')
-                label_filename2 =label_preposition + data_filename2.replace('.npy', '.xml')
 
-                label_filepath1 = os.path.join(labels_path, label_filename1) #parts_path.replace("parts", "xml")
-                label_filepath2 = os.path.join(labels_path, label_filename2) #parts_path.replace("parts", "xml")
-
-                
-                if os.path.exists(label_filepath1):
-                    #print("Label exists")
-                    component1 = np.load(str(combination[0]))
+                if os.path.exists(label_filepath):
+                    print("Label exists")
+                    component1 = np.load(str(part))
                     component1 = np.squeeze(component1).astype('bool')
                     component1 = scipy.ndimage.binary_fill_holes(component1)
                     component1 = zoom(component1,(0.5,0.5,0.5))
                     
-                    component2 = np.load(str(combination[1]))
-                    component2 = np.squeeze(component2).astype('bool')
-                    component2 = scipy.ndimage.binary_fill_holes(component2)
-                    component2 = zoom(component2, (0.5, 0.5, 0.5))
                     # component = img_as_bool(rescale(component, 0.5))
                     # label = np.load(label_filepath)[i].reshape((11))
-                    xmldoc1 = minidom.parse(label_filepath1)
+                    xmldoc1 = minidom.parse(label_filepath)
                     itemlist1 = xmldoc1.getElementsByTagName('Bewertung')
+                    label =float(itemlist1[3].firstChild.nodeValue)
+                    print(label)
 
-                    xmldoc2 = minidom.parse(label_filepath2)
-                    itemlist2 = xmldoc2.getElementsByTagName('Bewertung')
+                    # if int(itemlist1[3].firstChild.nodeValue) == int(itemlist2[3].firstChild.nodeValue):
+                    #     # label1 = 1.0
+                    #     # label2 = 1.0
+                    #     continue
+                    # elif int(itemlist1[3].firstChild.nodeValue) > int(itemlist2[3].firstChild.nodeValue):
+                    #     label1 = 1.0
+                    #     label2 = 0.0
+                    # else:
+                    #     label1 = 0.0
+                    #     label2 = 1.0
 
-
-                    if int(itemlist1[3].firstChild.nodeValue) == int(itemlist2[3].firstChild.nodeValue):
-                        # label1 = 1.0
-                        # label2 = 1.0
-                        continue
-                    elif int(itemlist1[3].firstChild.nodeValue) > int(itemlist2[3].firstChild.nodeValue):
-                        label1 = 1.0
-                        label2 = 0.0
-                    else:
-                        label1 = 0.0
-                        label2 = 1.0
 
                     #
                     # value = int(itemlist[i].firstChild.nodeValue)
@@ -156,24 +145,26 @@ def write_to_dataset_worker(thread_number):
                     # current_label = current_label.astype(np.float32)
 
                     
-
-                    serialized_example1 = serialize_example(component1,component2  , label1)
-                    serialized_example2 = serialize_example(component2, component1, label2)
+                    
+                    serialized_example1 = serialize_example(component1  , label)
+                    # serialized_example2 = serialize_example(component2, component1, label2)
 
                     
 
                     writer.write(serialized_example1)
-                    writer.write(serialized_example2)
+                    # writer.write(serialized_example2)
                     
                     count += 1
-                    print(str(count) + " / 500000")
-                    combinations.task_done()
+                    print(str(count) + " / 255")
+                    parts.task_done()
                 else:
                     print("Failed")
-                    print(label_filepath1)
+                    print(label_filepath)
                     sys.exit()
             except Exception as e:
                 print("Error: " + str(e))
+                print(traceback.format_exc())
+                break
 
 
 
@@ -196,16 +187,16 @@ if __name__ == '__main__':
 
     obj_filepaths = Path(str(parts_path)).rglob('*.npy')
     obj_filepaths = list(obj_filepaths) #[:10]
-    pairs = list((itertools.combinations(obj_filepaths, 2)))
-    combinations = queue.Queue()
-    [combinations.put(i) for i in pairs]
+    #pairs = list((itertools.combinations(obj_filepaths, 2)))
+    parts = queue.Queue()
+    [parts.put(i) for i in obj_filepaths]
 
 
     options = tf.io.TFRecordOptions(compression_type='GZIP')
 
 
-    for thread in range(32):
+    for thread in range(16):
         threading.Thread(target=write_to_dataset_worker, args=(thread,)).start()
     print('waiting for tasks to complete')
-    combinations.join()
+    parts.join()
     print('done')

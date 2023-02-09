@@ -12,4 +12,6 @@ cache
 optimization/results
 ckpts
 data
-data_toolbox
+data_toolbox/output
+data_toolbox/output*
+*.txt

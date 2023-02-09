@@ -66,12 +66,12 @@ if __name__ == "__main__":
     comparator = Comparator()
     comparator_input = tf.zeros(shape=(1, 64, 64, 64, 1))
     comparator((comparator_input, comparator_input))
-    comparator.load_weights('ckpts/comparator/')
+    comparator.load_weights('ckpts/comparator_newdataset/')
     comparator.trainable = False
 
     mapper = LatentMapper(generator.latent_size, num_layers=3)
     mapper.build((None, generator.latent_size))
-    mapper.load_weights('ckpts/mapper/mapper_2.0_1.0_1.0_0.0/20220816-134422/')
+   # mapper.load_weights('ckpts/mapper/mapper_2.0_1.0_1.0_0.0/20220816-134422/')
     mapper.summary()
 
     optimizer = Adam(learning_rate=parameters.learning_rate)

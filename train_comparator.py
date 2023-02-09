@@ -15,11 +15,11 @@ from training import dataset
 from models.base_models import Comparator
 
 class TrainingArguments:
-    epochs: int = 20
+    epochs: int = 5
     batch_size: int = 32
     learning_rate: float = 1e-3
     adam_eps: float = 1e-7
-    val_size: int = 200
+    val_size: int = 2421
 
 
 parameters = TrainingArguments()
@@ -42,16 +42,19 @@ if len(gpus) > 2:
     strategy = tf.distribute.MirroredStrategy()
 else:
     strategy = tf.distribute.get_strategy()
-tfrecords = list(Path('data_toolbox/output/').rglob('*.tfrecords'))
+tfrecords = list(Path('data_toolbox/output_6.12.22/').rglob('*.tfrecords'))
 #tfrecords = ['data/simpleGRAB_1000.tfrecords']
 tf_dataset = dataset.get_simplegrab_dataset(tfrecords)
 
-val_dataset = tf_dataset.take(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
+for data,label in tf_dataset:
+        print(label)
+
+val_dataset = tf_dataset.take(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE).repeat()
 val_dataset = strategy.experimental_distribute_dataset(val_dataset)
-train_dataset = tf_dataset.skip(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).map(lambda x, y: dataset.simple_grab_aug(x, y)).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)
+train_dataset = tf_dataset.skip(parameters.val_size).shuffle(2048, reshuffle_each_iteration=True).map(lambda x, y: dataset.simple_grab_aug(x, y)).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE).repeat()
 train_dataset = strategy.experimental_distribute_dataset(train_dataset)
 
-checkpoint_dir = 'ckpts/comparator_newdataset/'
+checkpoint_dir = 'ckpts/comparator_newdataset_test/'
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_dir,
         save_freq='epoch',
@@ -61,7 +64,7 @@ checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         save_best_only=True)
 
 tensorboard_callback = tf.keras.callbacks.TensorBoard(
-    log_dir='logs/comparator_newdataset'
+    log_dir='logs/comparator_newdataset_test'
 )
 
 with strategy.scope():
@@ -97,7 +100,10 @@ comparator.fit(
     validation_data=val_dataset,
     verbose=1,
     epochs=parameters.epochs,
-    callbacks=[checkpoint_callback, tensorboard_callback])
+    callbacks=[checkpoint_callback, tensorboard_callback],
+      steps_per_epoch = 680,
+      validation_steps = 75  ),
+
 
 comparator.load_weights(checkpoint_dir)
 comparator.evaluate(val_dataset)

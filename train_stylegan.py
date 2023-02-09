@@ -15,7 +15,7 @@ from training import dataset
 class ModelParameters:
     img_dim: int = 64
     latent_size: int = 160
-    label_size: int = 9
+    label_size: int = 0 #9
     num_layers: int = 8
     gen_filters: List = field(default_factory=lambda:[128, 128, 64, 32, 16])
     disc_filters: List = field(default_factory=lambda:[16, 32, 64, 64, 128, 128, 128])
@@ -55,7 +55,7 @@ class TrainingArguments:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--use_gpu", type=bool, default=False, help="use GPU")
+    parser.add_argument("--use_gpu", type=bool, default=True, help="use GPU")
     parser.add_argument("--memory_growth", type=bool, default=False, help="use memory growth")
     # parser.add_argument("--data_dir", type=str, default="/mnt/md0/Pycharm_Raid/datasets/mcb/32", help="path to folder containing data")
 
@@ -109,7 +109,8 @@ def main():
 
     train_dataset = tf_dataset.shuffle(2048, reshuffle_each_iteration=True).repeat(5000).batch(training_args.global_batch_size).prefetch(tf.data.AUTOTUNE)
     fakelabel_dataset = tf_dataset.map(lambda _, y: y).shuffle(2048, reshuffle_each_iteration=True).repeat(5000).batch(training_args.global_batch_size).prefetch(tf.data.AUTOTUNE)
-    
+    # The MCB dataset of screws and bolts consists of 22788 components from the 9 different categories. The label represents the category
+
     dist_train_dataset = strategy.experimental_distribute_dataset(train_dataset)
     dist_fakelabel_dataset = strategy.experimental_distribute_dataset(fakelabel_dataset)
     dist_train_dataset_iterator = iter(dist_train_dataset)
@@ -121,7 +122,7 @@ def main():
         model.summary()
         model.compile(training_args=training_args)
     
-    #@tf.function
+    @tf.function
     def distributed_train_step(dist_data, dist_real_labels, dist_fake_labels):
         strategy.run(model.train_step, args=(dist_data, dist_real_labels, dist_fake_labels))
 
@@ -156,7 +157,7 @@ def main():
             rt = model.training_metrics['loss_signs_real'].result()
             nimg_delta = model.args.apa_interval * model.args.global_batch_size
             nimg_ratio = nimg_delta / (model.args.tune_kimg * 1000)
-            deception_strength = model.deception_strength.read_value() + nimg_ratio * np.sign(rt - model.args.tune_target)
+            deception_strength = model.ckpt.deception_strength.read_value() + nimg_ratio * np.sign(rt - model.args.tune_target)
             deception_strength = min(max(deception_strength, 0), 0.9)
 
             model.ckpt.deception_strength.assign(deception_strength)

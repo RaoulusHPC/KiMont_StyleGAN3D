@@ -82,7 +82,7 @@ class StyleGAN(tf.keras.Model):
             
         self.manager = tf.train.CheckpointManager(
             self.ckpt,
-            directory='./tf_ckpts',
+            directory='./tf_ckpts_stylegan_no_label',
             max_to_keep=None)
         self.ckpt.restore(self.manager.latest_checkpoint)
         if self.manager.latest_checkpoint:

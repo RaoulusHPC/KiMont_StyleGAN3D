@@ -26,6 +26,7 @@ if __name__ == "__main__":
 
     model = StyleGAN(model_parameters=ModelParameters())
     model.build()
+    model.summary()
     model.setup_moving_average()
 
     ckpt = tf.train.Checkpoint(
@@ -33,10 +34,10 @@ if __name__ == "__main__":
         generator_ema=model.generator_ema)
     manager = tf.train.CheckpointManager(
         ckpt,
-        directory='./tf_ckpts',
+        directory='./tf_ckpts_stylegan_no_label',
         max_to_keep=None)
 
-    ckpt.restore('./tf_ckpts/ckpt-20').expect_partial() #manager.latest_checkpoint
+    ckpt.restore('./tf_ckpts_stylegan_no_label/ckpt-20').expect_partial() #manager.latest_checkpoint
     print("Loaded weights from ckpt-20")
     
     tfrecords = ['data/projected_images.tfrecords']
@@ -47,13 +48,13 @@ if __name__ == "__main__":
     val_dataset = tf_dataset.skip(parameters.train_size).shuffle(parameters.train_size, reshuffle_each_iteration=True).batch(parameters.batch_size).prefetch(tf.data.AUTOTUNE)   
     
     for generated_image, w, l  in train_dataset:
-    	print(generated_image.shape)
-    	output = model.generator_ema.synthesize(w)
-    	index = random.randint(1,32)
-    	comp = []
-    	comp.append(generated_image[index,:,:,:,:])
-    	comp.append(output[index,:,:,:,:])
-    	print(comp[0].shape)
-    	screenshot_and_save(comp, filepath='logs/viz_latents/test.png')
-    	break
+            print(generated_image.shape)
+            output = model.generator_ema.synthesize(w)
+            index = random.randint(1,32)
+            comp = []
+            comp.append(generated_image[index,:,:,:,:])
+            comp.append(output[index,:,:,:,:])
+            print(comp[0].shape)
+            screenshot_and_save(comp, filepath='logs/viz_latents/test.png')
+            break
     

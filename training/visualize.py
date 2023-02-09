@@ -5,6 +5,7 @@ import pyvista as pv
 import matplotlib
 import os
 from math import sqrt, ceil, floor
+from xvfbwrapper import Xvfb
 
 if os.environ.get('AM_I_IN_A_DOCKER_CONTAINER', False):
     pv.start_xvfb()
@@ -32,6 +33,8 @@ def rescale_tensor(tensor, new_max=1, new_min=0):
 
 
 def screenshot_and_save(tensors, filepath: str, shape: tuple=None, window_size: tuple=None):
+    vdisplay = Xvfb()
+    vdisplay.start()
     if not shape:
         dim = sqrt(len(tensors))
         shape = (ceil(dim), floor(dim))
@@ -44,6 +47,7 @@ def screenshot_and_save(tensors, filepath: str, shape: tuple=None, window_size: 
     plotter.deep_clean()
     plotter.close()
     del plotter
+    vdisplay.stop()
 
 def _add_tensors_to_plotter(plotter: pv.Plotter, tensors, shape: tuple, shade: bool=True):
     for i in range(shape[0]):
@@ -52,6 +56,7 @@ def _add_tensors_to_plotter(plotter: pv.Plotter, tensors, shape: tuple, shade: b
                 tensor = tensors.pop()
                 tensor = np.squeeze(np.array(tensor))
                 plotter.subplot(i, j)
+                tensor = pv.wrap(tensor)
                 plotter.add_volume(tensor, cmap="viridis", shade=shade)
 
 

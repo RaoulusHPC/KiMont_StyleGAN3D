@@ -2,6 +2,7 @@
 import argparse
 import numpy as np
 import tensorflow as tf
+from pathlib import Path
 
 from training import dataset, visualize
 from projection.projector import LatentProjector
@@ -28,18 +29,19 @@ if __name__ == "__main__":
         generator_ema=model.generator_ema)
     manager = tf.train.CheckpointManager(
         ckpt,
-        directory='evia-server-ckpts/v2',
+        directory='tf_ckpts_stylegan_no_label',
         max_to_keep=None)
 
-    ckpt.restore('./tf_ckpts/ckpt-20').expect_partial() #manager.latest_checkpoint
+    ckpt.restore('./tf_ckpts_stylegan_no_label/ckpt-20').expect_partial() #manager.latest_checkpoint
     print("Loaded weights from ckpt-20")
     #image = np.load(args.file_path)
-    tfrecords = ['data/mcb64_screws.tfrecords']
-    train_dataset = dataset.get_mcb_dataset(
-        tfrecords=tfrecords,
-        batch_size=1,
-        repeat=1,
-        augment_function=None)
+    #tfrecords = ['data/mcb64_screws.tfrecords']
+    tfrecords = list(Path('data_toolbox/output_ranjit_dataset/').rglob('*.tfrecords'))
+    train_dataset = dataset.get_simplegrab2_dataset(
+         tfrecords=tfrecords,)
+        # batch_size=1,
+        # repeat=1,
+        # augment_function=None)
 
     # for data, label in train_dataset:
     #     print(data.shape, label.shape)
@@ -48,13 +50,15 @@ if __name__ == "__main__":
     #     # visualize.visualize_tensors([data])
     #     break
     
-    train_dataset = train_dataset.take(10_000)
+    train_dataset = train_dataset.take(255)  #10000
 
+    for data,label in train_dataset:
+        print(label)
     storage = []
 
     for data, label in train_dataset:
-        projector = LatentProjector(model.generator_ema, steps=500, noise=0.01, screenshot=False)
-        projector.init_w(label, w_avg_samples=10_000)
+        projector = LatentProjector(model.generator_ema, steps=200, noise=0.01, screenshot=False) #500
+        projector.init_w(label, w_avg_samples=255)  #10000
         w, loss, generated_image = projector.project(data)
         if loss < 0.02:
             storage.append((projector.original_image, generated_image, label, w))
@@ -90,7 +94,7 @@ if __name__ == "__main__":
         
         return tf.train.Example(features=tf.train.Features(feature=feature)).SerializeToString()
     
-    record_file = 'data/latents.tfrecords'
+    record_file = 'data/latents_fraunhofer_dataset.tfrecords'
     options = tf.io.TFRecordOptions(compression_type='GZIP')
 
     with tf.io.TFRecordWriter(record_file, options) as writer:

@@ -1,5 +1,7 @@
 
 import tensorflow as tf
+# tf.compat.v1.disable_eager_execution()
+import numpy as np
 
 
 label_map = {
@@ -234,6 +236,70 @@ def get_mcb_dataset(tfrecords, batch_size: int=1, repeat: int=1, augment_functio
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
     return dataset
 
+def get_fraunhofer_dataset(tfrecords, batch_size: int=1, repeat: int=1, augment_function: callable=None):
+    raw_component_dataset = tf.data.TFRecordDataset(tfrecords, compression_type='GZIP')
+
+    # Create a dictionary describing the features.
+    component_feature_description = {
+        'component_raw': tf.io.FixedLenFeature([], tf.string),
+        'label_raw': tf.io.FixedLenFeature([], tf.float32),
+    }
+
+    def read_tfrecord(serialized_example):
+        # Parse the input tf.train.Example proto using the dictionary above.
+        example = tf.io.parse_single_example(serialized_example, component_feature_description)
+        component = tf.io.parse_tensor(example['component_raw'], out_type='bool')
+        component = tf.cast(component, 'float32')
+        component = component[..., tf.newaxis]
+        component = 2 * component - 1
+
+        print(component)
+        index = example['label_raw']
+        print(index)
+        label = np.zeros((11))
+        print(label)
+        label[index.item()] = 1
+        print(label)
+        return component, label
+
+    dataset = raw_component_dataset.map(read_tfrecord)
+    dataset = dataset.shuffle(2048, reshuffle_each_iteration=True)
+    dataset = dataset.repeat(repeat)
+    if augment_function:
+        dataset = dataset.map(lambda x, y: (augment_function(x), y))
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    return dataset
+
+def get_simplegrab2_dataset(tfrecords):
+    raw_component_dataset = tf.data.TFRecordDataset(tfrecords, compression_type='GZIP')
+
+    # Create a dictionary describing the features.
+    component_feature_description = {
+        'component_raw': tf.io.FixedLenFeature([], tf.string),
+        'label_raw': tf.io.FixedLenFeature([], tf.float32),
+    }
+
+    def read_tfrecord(serialized_example):
+        # Parse the input tf.train.Example proto using the dictionary above.
+        example = tf.io.parse_single_example(serialized_example, component_feature_description)
+        component1 = tf.io.parse_tensor(example['component_raw'], out_type='bool')
+        component1 = tf.cast(component1, 'float32')
+        component1 = component1[..., tf.newaxis]
+        component1 = 2 * component1 - 1
+        label = example['label_raw']
+        one_hot = tf.one_hot(tf.cast(label,tf.int32),depth=11)
+        one_hot = tf.reshape(one_hot, [1,11])
+        #test = tf.keras.backend.get_value(label) 
+        # print(test)
+        # print("Label: " + str(label) )
+        
+
+        return component1, one_hot
+        
+    dataset = raw_component_dataset.map(read_tfrecord)
+    return dataset
+
 def get_simplegrab_dataset(tfrecords):
     raw_component_dataset = tf.data.TFRecordDataset(tfrecords, compression_type='GZIP')
 
@@ -256,6 +322,8 @@ def get_simplegrab_dataset(tfrecords):
         component2 = component2[..., tf.newaxis]
         component2 = 2 * component2 - 1
         label = example['label']
+        print("Label: " + str(label))
+
         return (component1, component2), label
         
     dataset = raw_component_dataset.map(read_tfrecord)

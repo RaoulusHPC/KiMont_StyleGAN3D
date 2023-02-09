@@ -52,11 +52,11 @@ if __name__ == "__main__":
     comparator = Comparator()
     comparator_input = tf.zeros(shape=(1, 64, 64, 64, 1))
     comparator((comparator_input, comparator_input))
-    comparator.load_weights('ckpts/comparator/')
+    comparator.load_weights('ckpts/comparator_newdataset/')
 
     mapper = LatentMapper(generator.latent_size, num_layers=4)
     mapper.build((None, generator.latent_size))
-    mapper.load_weights('ckpts/mapper/mapper_2.0_1.0_1.0_0.0/20220817-144051/')
+    mapper.load_weights('ckpts/mapper/mapper_2.0_1.0_1.0_0.0/20230115-072921/')
 
     c = 0
     for original_image, generated_image, w in test_dataset:
